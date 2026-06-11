@@ -1,0 +1,19 @@
+# Vertex Vizier study spec for neural-expert HPO (sec10.5). Budget is hard-capped per refit:
+# f3/f4 -> 30 trials, f1/f2 -> 20 trials. Every trial auto-calls registry.log_trial.
+displayName: tactic-mob-hpo
+studySpec:
+  algorithm: ALGORITHM_UNSPECIFIED   # Vizier default (Bayesian/GP)
+  metrics:
+    - metricId: val_pinball
+      goal: MINIMIZE
+  parameters:
+    - parameterId: lr
+      doubleValueSpec: { minValue: 0.0003, maxValue: 0.003 }
+      scaleType: UNIT_LOG_SCALE
+    - parameterId: dropout
+      doubleValueSpec: { minValue: 0.0, maxValue: 0.3 }
+      scaleType: UNIT_LINEAR_SCALE
+    - parameterId: channels
+      discreteValueSpec: { values: [32, 64] }
+    - parameterId: seq_len
+      discreteValueSpec: { values: [32, 64, 128] }

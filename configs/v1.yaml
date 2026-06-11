@@ -1,0 +1,60 @@
+# configs/v1.yaml — TACTIC-MoB v4 starting config (Appendix B verbatim + gate table + vertex)
+seed: 1338
+panel: {start: 2016-01-01, holdout_months: 18, price_min: 5.0, adv_min_usd: 5_000_000,
+        spread_max_bps: 40, min_age_days: 126, top_p: 0.20}
+labels: {ewma_lambda: 0.94, sigma_floor: 0.002, quantiles: [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95]}
+costs: {fee_floor_bps: 0.5, c_impact: 0.10, spread_cap_bps: 500}
+structures: [OO, ON, ID]            # pruned by G1b
+bocpd: {hazards: [0.015873, 0.007937, 0.003968], nig: {mu0: 0, kappa0: 1, alpha0: 2, beta0: 1}}
+pid: {alphas: [0.2, 0.1], eta_p: 0.05, eta_i: 0.005}
+emonitor: {alarm: 20.0, floor: 0.25, beta: 0.5}
+experts: {seeds: 5, hpo_budget: {f1: 20, f2: 20, f3: 30, f4: 30}, param_cap: 300000}
+decision: {kappa: null,  # set on first val year, then frozen; logged as trial
+           k_buy: 20, k_hold: 60, w_max: 0.075, gross_cap: 1.0, no_trade_bps: 25,
+           gamma_risk: 5.0, dd_target: 0.30, dd_prob: 0.05, turnover_budget_m: 0.50}
+gates: {pbo_max: 0.20, dsr_min: 0.95, spa_p: 0.05, dm_p: 0.05, ic_min: 0.005,
+        cost_stress: 1.5, jaccard_min: 0.8, alpha_t_min: 2.0}
+validation: {refit: annual, purge_days: 2, embargo_days: 5, cpcv_groups: 8, cpcv_test: 2,
+             bootstrap_B: 2000, nw_lags: 10}
+
+# --- frozen design constants (NOT charged to N; declared per Appendix D) ---
+frozen:
+  beta_g: 0.5            # BOCPD exposure multiplier coefficient
+  aa_eta: 1.0           # Aggregating Algorithm learning rate
+  aa_weight_floor: 0.01
+  pid_components: [on, in, cc]
+  feature_set_version: v1
+  seq_len: 64
+  seq_channels: 18
+  static_dim: 12
+  market_state_dim: 5
+
+# --- master gate table (§17); loaded by common/gates.py ---
+gate_table:
+  G0a: {phase: 1,    test: "day-1 audits complete",        threshold: "report exists",         on_fail: halt}
+  G0b: {phase: 2,    test: "unknown terminal types",       threshold: 0.05, soft: true,         on_fail: warn_bound}
+  G1:  {phase: 5,    test: "predictability exists",        threshold: "ic_min OR VR OR tugofwar", on_fail: halt_negative_report}
+  G1b: {phase: 5,    test: "structure break-even",         threshold: "appendix A.10",          on_fail: drop_structure}
+  G2:  {phase: 13,   test: "turnover one-sided",           threshold: 0.50,                     on_fail: scale_or_fail}
+  G3:  {phase: 13,   test: "beat LightGBM rung net",       threshold: {dm_p: 0.05, rw: true},   on_fail: ship_rung6}
+  G4:  {phase: 9,    test: "AA beats best expert net",     threshold: {dm_p: 0.05},             on_fail: demote_aa}
+  G5:  {phase: 9,    test: "f4 beats f3 net",              threshold: {dm_p: 0.05},             on_fail: cut_attention}
+  G6:  {phase: 12,   test: "1.5x cost stress",             threshold: "net > benchmark",        on_fail: fail}
+  G7:  {phase: 12,   test: "worst-timing fills",           threshold: "net > benchmark",        on_fail: fail}
+  G8:  {phase: 13,   test: "PBO / DSR / SPA",              threshold: {pbo: 0.20, dsr: 0.95, spa_p: 0.05}, on_fail: fail}
+  G9:  {phase: 13,   test: "residual alpha after attrib",  threshold: {t: 2.0},                 on_fail: fail}
+  G10: {phase: 12,   test: "negative controls all green",  threshold: "all green",              on_fail: fail}
+  G11: {phase: live, test: "paper-trade e-process + fills", threshold: "no alarm; <= noise floor", on_fail: no_capital}
+
+# --- Vertex AI (heavy compute; overridden by env where set) ---
+vertex:
+  project_id: project-c779f701-1a49-4a58-b54
+  region: us-central1
+  account: juliansjuan08@gmail.com
+  bucket: gs://gmda-vertex-c779f701-uscentral1
+  bucket_fallback: gs://gmda-vertex-c779f701-uscentral1-juliansjuan08
+  machine_full: n1-standard-16
+  machine_smoke: n1-standard-4
+  image_cpu: us-docker.pkg.dev/vertex-ai/training/xgboost-cpu.2-1:latest
+  image_gpu: us-docker.pkg.dev/vertex-ai/training/pytorch-xla.2-4.py310:latest
+  package_module: tactic.models.hpo_vertex

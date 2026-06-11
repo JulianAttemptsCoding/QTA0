@@ -1,0 +1,52 @@
+# secrets
+.env
+*.env
+!.env.example
+
+# data — never commit raw/curated/holdout data
+data/raw/
+data/curated/
+data/features/
+data/labels/
+data/holdout/
+data/diagnostic_quarantine/
+!data/**/.gitkeep
+
+# registry artifacts (ledger is generated; keep dir, ignore parquet)
+registry/trial_ledger.parquet
+registry/config_hashes/*
+registry/prereg/*
+!registry/**/.gitkeep
+
+# reports (generated)
+reports/runs/
+reports/PAPER_TABLES/
+reports/*.md
+!reports/.gitkeep
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# hashes sidecars
+*.sha256
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# vertex local
+vertex/dist/
+*.tar.gz

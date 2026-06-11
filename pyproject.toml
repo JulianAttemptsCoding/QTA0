@@ -1,0 +1,64 @@
+[project]
+name = "tactic-mob"
+version = "4.0.0"
+description = "TACTIC-MoB v4 — Transaction-cost-Aware, Component-decomposed, Throttled Mixture-of-Betting-experts daily US-equity backtest pipeline."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "Julian Juan", email = "juliansjuan08@gmail.com" }]
+
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.1",
+    "pyarrow>=14",
+    "polars>=0.20",
+    "scipy>=1.11",
+    "scikit-learn>=1.4",
+    "lightgbm>=4.1",
+    "torch>=2.2",
+    "cvxpy>=1.4",
+    "statsmodels>=0.14",
+    "PyWavelets>=1.5",
+    "alpaca-py>=0.20",
+    "requests>=2.31",
+    "bidask>=2.0",
+    "matplotlib>=3.8",
+    "pyyaml>=6.0",
+    "tqdm>=4.66",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "hypothesis>=6.98",
+    "ruff>=0.3",
+    "pytest-cov>=4.1",
+]
+vertex = [
+    "google-cloud-aiplatform>=1.40",
+    "google-cloud-storage>=2.14",
+]
+
+[project.scripts]
+tactic = "tactic.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B"]
+ignore = ["E501"]
