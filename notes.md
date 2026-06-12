@@ -244,3 +244,31 @@ split, submit f4 to Vertex; (5) poll→download→backtest OOS 2022→now vs SPY
   - OOS   2022-01-12 → 2026-06-09 = 1105 (216,280 entity-rows)
   - entities/day min/med/max = 192/195/196 (breadth 83→~195).
 - Warmup start 2016-07-26 (126d from 2016-01-04). Clean. Ready for Vertex.
+
+### Vertex job submitted (overfit-divergence run)
+- run_id **f4_vertex_20260612_230413**, jobId 7559341435384758272, n1-standard-16, pytorch-xla py310.
+- f4, epochs=60, seeds=3, patience=12, train_end=2020-12-31 val_end=2021-12-31 (OOS 2022+).
+- High patience runs past val min so train↓/val↑ divergence visible in loss_history; best-val ckpt
+  used for OOS preds (sound ML). Smoke (2ep local) OK val_pinball 1.651, ~400s/ep CPU single.
+- artifacts → gs://gmda-vertex-c779f701-uscentral1/runs/f4_vertex_20260612_230413/vertex_run/
+- Polling to terminal state (don't go offline).
+
+### RESULTS — wide-universe OOS 2022-01 → 2026-06 (run f4_vertex_20260612_230413, SUCCEEDED ~2.2hr)
+Split train1118 / val245 / OOS1105 batches, 196 names. best_val_pinball 1.604.
+**Overfit divergence captured:** train pinball ↓ monotone (seed1338 1.697→1.584), val bottoms
+~ep4 (~1.605) then rises → early-stop patience12, best-val ckpt used.
+
+Backtest k_buy=20/k_hold=60 (spec band), net of costs:
+- Strategy CAGR **+5.6%** vs SPY **+11.9%**; Sharpe 0.47 vs 0.72; vol 13.9 vs 17.9; maxDD
+  -20.1 vs -23.5; alpha_ann **-1.5%**. **Does NOT beat buy-and-hold.**
+- By year: strat WINS only 2022 (-7.2 vs -17.5, defensive), LOSES 2023/24/25 mega-cap bull,
+  ~tie 2026. Equal-weight top-K can't track cap-weighted index in 2023-25.
+- Concentration sweep: k=5 → CAGR -10.7%/DD -42% (naive book fatal over 4.4yr incl 2022);
+  k=20 → +5.6%; k=30 → +6.2%. None beat SPY.
+- Predictor: IC **+0.0149** (positive, weak), hit 51.8%, cov80 76.0/cov90 87.3, pinball 1.668.
+- Gate notes (NOT enforced): G1 IC>0.005 present; G2 turnover 3%/day OK; **G3** DM vs SPY
+  p=0.204 (underperf not even significant); **G8 DSR** 0.06-0.27 ≪0.95 FAIL.
+
+**CONCLUSION:** honest negative — small +IC, mildly defensive (wins down-year, lower vol/DD), but
+does NOT beat SPY over a longer wider bear-inclusive OOS; gap within noise. Earlier 1yr/83-name
+"win" was window+concentration luck. Report results/f4_vertex_196_oos2022/RESULTS_OOS2022.md.
