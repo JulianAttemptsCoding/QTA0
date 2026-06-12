@@ -160,3 +160,23 @@ Ingest of ~80 names launched in background.
 - **Submitted 83-name training on Vertex:** job 2698031093080129536, run_id f4_vertex_20260612_111310,
   n1-standard-16, epochs=20 seeds=3. data_uri repo_inputs/20260612_111310,
   out_uri runs/f4_vertex_20260612_111310. ~83 names should give real cross-sectional breadth.
+
+---
+
+## VERTEX SUCCESS — 83-name f4 headline result
+
+- Job 2698031093080129536 **SUCCEEDED** (the "ERROR" log lines were pip's non-fatal dependency-
+  resolver warning). numpy<2 fix worked; trained on 83 names, in-container render produced plots.
+- Downloaded to results/f4_vertex_83names/. **OOS 2023 vs SPY:**
+  CAGR 41.9% vs 24.1%, Sharpe 1.82 vs 1.68, maxDD -9.2% vs -9.6%, alpha +9.1%, beta 1.25.
+  Predictor: pinball 1.670, **rank-IC 0.0157 (IR 0.072)**, hit 52.4%, coverage 76.3%/87.8%
+  (well-calibrated, slightly conservative). 20,003 OOS obs.
+- Train/val curves (3 seeds, early-stop @12/6/8 epochs): train pinball 1.69->1.58, val ~1.68.
+- **Breadth thesis confirmed:** 15 names IC~0 (trails SPY) vs 83 names IC 0.0157 (beats SPY).
+  Fundamental Law IR~IC*sqrt(breadth). The 3-epoch 15-name "win" was undertrained noise.
+- Wrote results/FINAL_REPORT.md (QuantConnect-style table + method + honest caveats) + README headline.
+- Submitted f3 ablation (no cross-sectional attention) job 6993902187638161408 for the f4-vs-f3
+  comparison (gate G5). Polling.
+- Honest caveats logged: 83 << 400-700 spec breadth; single OOS year (2023, momentum-friendly);
+  CPCV/DSR/SPA at scale + RC-Kelly/GP decision layer are the documented next steps before any
+  deployability claim.

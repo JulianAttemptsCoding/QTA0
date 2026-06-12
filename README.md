@@ -27,8 +27,23 @@ run** (§0.3.10).
 | Vertex AI submission (custom-jobs, Vizier spec, packaging) | **implemented** |
 
 `make all` runs the §18 order and stops cleanly at the first scaffold boundary or kill gate.
-End-to-end verified on a 15-symbol × 5-year real slice: ingest → costs → labels (99.9% auction
-coverage) → universe → diagnostics (G1 passes, max |IC| ≈ 0.025).
+
+## Results (out-of-sample 2023, trained on Vertex AI)
+
+Full pipeline run end-to-end on 83 liquid S&P-500 names. f4 (hybrid attention) trained on Vertex
+(`n1-standard-16`), 20 epochs × 3 seeds. **OOS strategy vs SPY buy-and-hold:**
+
+| | TACTIC-MoB (net) | SPY |
+|---|---|---|
+| CAGR | **41.9%** | 24.1% |
+| Sharpe | **1.82** | 1.68 |
+| Max drawdown | -9.2% | -9.6% |
+| Alpha (ann.) | **+9.1%** | — |
+| OOS rank-IC | 0.0157 | — |
+
+Breadth matters: the same model on only 15 names has ~0 OOS IC and trails SPY (Fundamental Law,
+`IR≈IC·√breadth`). Full writeup + graphs (equity vs SPY, drawdown, train/val loss curves,
+calibration): [`results/FINAL_REPORT.md`](results/FINAL_REPORT.md).
 
 > Calibration note: the spread blend is the spec'd median of three *daily-OHLC* estimators
 > (PLAN.md §5.1); Corwin-Schultz/Abdi-Ranaldo run high on liquid daily bars, so blended
