@@ -85,3 +85,27 @@ QA/QC every step, produce QuantConnect-style results + graphs, compare vs SPY bu
   dates. Artifacts in reports/runs/<run_id>/ (loss_history.csv, oos_predictions.parquet).
 - Compute estimate: full local run 25 epochs x 5 seeds ~= 50 min CPU. Vertex GPU will be faster;
   will submit the full f4 + f3-ablation run to Vertex and wait with cooldowns.
+
+---
+
+## Backtest + results pipeline + Vertex submission
+
+- `backtest/run.py` + `reports/results.py`: OOS backtest vs SPY, QuantConnect-style metrics,
+  4 plots (equity, drawdown, loss curve, calibration), RESULTS.md + metrics.json.
+- **Smoke (3-epoch) OOS 2023:** TACTIC-MoB net 46.7% total / Sharpe 1.99 vs SPY 22.9% / 1.68;
+  alpha 13.5%, beta 1.28; rank-IC 0.025. (Undertrained; full run pending.)
+- **Bug fixed:** predictor coverage compared standardized-scale quantiles to RAW returns -> 100%.
+  Now scored against the stored standardized `y_true` (pinball + coverage correct scale).
+- config.py made container-safe: `$TACTIC_CONFIG_DIR/DATA_DIR/REGISTRY_DIR/REPORTS_DIR` overrides
+  + repo/CWD fallbacks (so the pip-installed package finds configs on a Vertex worker).
+
+### Vertex
+- `models/vertex_entry.py`: downloads panel+config from GCS, trains, renders, uploads artifacts.
+- `vertex/train_on_vertex.py`: uploads curated panel + v1.yaml + sdist, submits custom job.
+- **Bug fixed:** Windows subprocess can't exec gcloud/gsutil `.cmd` without a shell -> switched to
+  `gcloud storage cp` via shell=True.
+- **SUBMITTED full f4 run on Vertex:** job id `5641414924543459328`,
+  run_id `f4_vertex_20260612_104701`, machine n1-standard-16, image pytorch-xla.2-4,
+  epochs=25 seeds=5. Artifacts -> gs://gmda-vertex-c779f701-uscentral1/runs/f4_vertex_20260612_104701.
+- Parallel safety net: full f4 (25ep x 3seed) also training locally for immediate results.
+- Next: wait (cooldown) for Vertex job; poll status; download artifacts; render; compare to local.

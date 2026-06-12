@@ -15,10 +15,25 @@ import yaml
 
 # repo root = .../<repo>/   (src/tactic/common/config.py -> up 4)
 ROOT = Path(__file__).resolve().parents[3]
-CONFIGS_DIR = ROOT / "configs"
-DATA_DIR = ROOT / "data"
-REGISTRY_DIR = ROOT / "registry"
-REPORTS_DIR = ROOT / "reports"
+
+
+def _resolve_configs_dir() -> Path:
+    """Find configs/. Honors $TACTIC_CONFIG_DIR (set by the Vertex entry), else repo root,
+    else CWD — so the package works both from a source checkout and pip-installed in a container.
+    """
+    env = os.environ.get("TACTIC_CONFIG_DIR")
+    if env and (Path(env) / "v1.yaml").exists():
+        return Path(env)
+    for cand in (ROOT / "configs", Path.cwd() / "configs", Path.cwd()):
+        if (cand / "v1.yaml").exists():
+            return cand
+    return ROOT / "configs"
+
+
+CONFIGS_DIR = _resolve_configs_dir()
+DATA_DIR = Path(os.environ.get("TACTIC_DATA_DIR", ROOT / "data"))
+REGISTRY_DIR = Path(os.environ.get("TACTIC_REGISTRY_DIR", ROOT / "registry"))
+REPORTS_DIR = Path(os.environ.get("TACTIC_REPORTS_DIR", ROOT / "reports"))
 
 RAW = DATA_DIR / "raw"
 CURATED = DATA_DIR / "curated"
@@ -49,10 +64,10 @@ def load_dotenv(path: str | Path | None = None) -> dict[str, str]:
     return out
 
 
-@lru_cache(maxsize=8)
 def load_config(name: str = "v1") -> dict[str, Any]:
-    """Load configs/<name>.yaml as a plain dict (cached)."""
-    p = CONFIGS_DIR / f"{name}.yaml"
+    """Load configs/<name>.yaml as a plain dict. Resolves the configs dir at call time so a
+    late-set $TACTIC_CONFIG_DIR (e.g. on a Vertex worker) is honored."""
+    p = _resolve_configs_dir() / f"{name}.yaml"
     with open(p, encoding="utf-8") as fh:
         return yaml.safe_load(fh)
 
