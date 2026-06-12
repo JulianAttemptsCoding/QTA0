@@ -1,0 +1,87 @@
+# TACTIC-MoB v4 — Build / Train / Backtest Notes
+
+Append-only working log. Newest entries at the bottom. Nothing is ever deleted.
+
+---
+
+## 2026-06-12 — Session start: finish model → train/val/test → full backtest vs SPY
+
+### Goal
+Implement remaining PLAN.md phases, train experts (train/val/test), full backtest on Vertex,
+QA/QC every step, produce QuantConnect-style results + graphs, compare vs SPY buy-and-hold OOS.
+
+### Environment confirmed
+- Python 3.12, torch 2.4.1 **CPU only** (cuda=False) locally → neural training is slow locally;
+  use Vertex GPU image (`pytorch-xla.2-4`) for full f3/f4 training.
+- lightgbm 4.6.0, matplotlib 3.10.8, bidask, scipy, sklearn, statsmodels, pywt all present.
+- gcloud SDK 555, **active account juliansjuan08@gmail.com**, project
+  `project-c779f701-1a49-4a58-b54`, region us-central1.
+- GCS bucket `gs://gmda-vertex-c779f701-uscentral1` readable; has configs/ data/ packages/
+  runs/ reports/ etc. → Vertex submission path viable.
+
+### Status at start (already done + tested, 135 tests green, pushed 8ea7789)
+- Phase 0 core; Phase 1 ingestion (live-verified); Phase 2 universe+delistings; Phase 3
+  spreads+cost model; Phase 4 labels; Phase 5 diagnostics + gate G1.
+- Real slice ingested: 15 symbols (SPY QQQ AAPL MSFT NVDA AMZN GOOGL META JPM XOM JNJ WMT PG
+  KO HD), daily bars + auctions 2019–2023.
+
+### Plan for this session (execution order)
+1. `features/build_features.py` — 18-ch sequence tensor + static[12] + market-state[5], PIT.
+2. `models/panel_dataset.py` — one-date batches, masks.
+3. Experts: f2 LightGBM (CPU, fast), f3 CI-TCN, f4 hybrid attention (quantile heads, pinball).
+4. `models/train.py` — walk-forward annual refits, train/val/test, early stopping, loss curves.
+5. Decision layer: score → band → weights, turnover budget, costs (simplify GP/RC-Kelly first,
+   then add if time).
+6. `backtest/engine.py` — daily fills at next-open auction, explicit costs, NAV identity.
+7. Metrics + plots: equity vs SPY, drawdown, train/val loss/epoch, test predictor stats
+   (pinball, IC, hit-rate, calibration), QuantConnect-style table (CAGR/Sharpe/Sortino/maxDD/...).
+8. Validation: PBO/DSR/SPA where feasible.
+9. Scale full training to Vertex; wait with ScheduleWakeup cooldowns; retrieve; final report.
+
+### Design decisions / simplifications (will mark spec-deviations explicitly)
+- Iterate locally on a SMALL config (few epochs, 15-symbol universe) to QA correctness and get
+  REAL OOS-vs-SPY numbers fast; then scale to Vertex for the full run.
+- Risk-constrained Kelly (cvxpy) and full GP partial-adjustment are complex; first ship a
+  capped score-weight + buy/hold-band + turnover-cap decision layer (a valid PLAN.md fallback,
+  §12.6 "Fallback if infeasible: capped score weights"), then upgrade.
+
+---
+
+## Phase 4 features — built + QA'd
+
+- `features/build_features.py` implemented: 18 sequence channels, 12 static u, 5 market-state m.
+- **Bug found & fixed:** bars ingest manifest keyed only on `symbol:adjustment`, ignoring date
+  range → re-ingesting a wider range hit the stale 40-day smoke cache for AAPL/SPY. Fixed:
+  manifest now records {status,start,end} and only resumes if the cached range covers the
+  request. Re-ingested: all 15 symbols now have the full 1258 sessions (2019-01-02..2023-12-29).
+- **Bug found & fixed:** `_market_state` raised "All arrays must be of same length" (breadth
+  pivot had a different date index). Fixed by reindexing all M-series to `piv.index`.
+- Rebuilt full panel: spreads 18,870 entity-days; labels 18,870 (99.94% auction); features
+  18,870 (16,755 fully populated, all 18 ch + 12 u + 5 m non-null).
+- **Leakage QA (sec6.4):** recomputed AAPL channels on full series vs truncated@600; 2880/2880
+  finite cells, **max abs diff = 0.0** → features at t invariant to future bars. PIT confirmed.
+- Note/deviation: only SPY,QQQ pass the universe S&P-500-membership filter (no wiki membership
+  table loaded), giving 1537 tradable entity-days. For THIS 15-liquid-name modeling experiment
+  the trainable universe = all 15 names passing price/ADV/age (they are all S&P 500 mega-caps);
+  the membership gate is a realism constraint relaxed here and noted.
+
+---
+
+## Modeling stack — built + smoke-validated
+
+- `panel_dataset.build_panel`: one-date batches; 1115 dates, 15 names/date, 2019-07-25..2023-12-27
+  (starts after 64-seq + 252-day mom warmup). Target = vol-standardized open(t+1)->open(t+2)
+  return (OO structure, 1-day hold), PIT-safe (no overlap with x_seq).
+- `experts/tcn_ci.py` f3: causal dilated TCN (6 blocks, k5, dil[1..32], 64ch, GELU, dropout0.1)
+  + non-crossing QuantileHead (median + softplus increments).
+- `experts/hybrid_xs.py` f4: f3 encoder -> [enc,u] tokens -> ONE MHSA(4 heads,d64) over the
+  date's N_t entities + residual -> quantile heads. **Params = 259,400** (~0.26M; PLAN target
+  0.15-0.25M, under the config param_cap 300k). Forward shape (N,7), non-crossing verified.
+- `models/train.py`: walk-forward split train(<=2021)/val(2022)/test-OOS(2023) with purge2+embargo5;
+  channel standardization fit on TRAIN only (fit-scope); AdamW+cosine, grad-clip 1.0, early-stop
+  patience 5 on val pinball; per-epoch train/val loss recorded; seeds quantile-averaged.
+- Smoke (3 epochs, 1 seed): 616/244/241 train/val/test batches; train pinball 1.737->1.647,
+  val 1.672->1.659->1.776 (early-stop would trigger). ~23 s/epoch CPU. OOS preds: 3615 rows /241
+  dates. Artifacts in reports/runs/<run_id>/ (loss_history.csv, oos_predictions.parquet).
+- Compute estimate: full local run 25 epochs x 5 seeds ~= 50 min CPU. Vertex GPU will be faster;
+  will submit the full f4 + f3-ablation run to Vertex and wait with cooldowns.

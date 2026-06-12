@@ -119,6 +119,39 @@ def _diagnostics(args):
     print(f"[diagnostics] G1 pass={res['g1_pass']} (max_ic={res['max_ic']:.4f})")
 
 
+def _features(args):
+    from .features.build_features import build_features
+    df = build_features(load_config())
+    print(f"[features] {len(df)} entity-days, {df.entity.nunique()} entities")
+
+
+def _train(args):
+    from .models.train import train
+    r = train(load_config(), model_kind=getattr(args, "model", "f4"),
+              epochs=getattr(args, "epochs", 25), seeds=getattr(args, "seeds", 1))
+    # stash run id for a subsequent backtest in the same `all` invocation
+    _train._last_run = r["run_id"]
+    print(f"[train] run {r['run_id']} val_pinball {r['val_pinball']:.5f}")
+
+
+def _latest_run() -> str | None:
+    from .common.config import REPORTS_DIR
+    runs = sorted((REPORTS_DIR / "runs").glob("*/"), key=lambda p: p.stat().st_mtime)
+    return runs[-1].name if runs else None
+
+
+def _backtest(args):
+    from .reports.results import render_run
+    rid = getattr(_train, "_last_run", None) or _latest_run()
+    if not rid:
+        raise RuntimeError("no training run found; run `tactic train` first")
+    render_run(rid)
+
+
+def _reports(args):
+    _backtest(args)
+
+
 # target -> callable
 PHASES: dict[str, object] = {
     "setup": _setup,
@@ -129,17 +162,17 @@ PHASES: dict[str, object] = {
     "universe": _universe,
     "costs": _costs,
     "labels": _labels,
-    "features": _stub_phase("tactic.features.build_features", "build_features"),
+    "features": _features,
     "diagnostics": _diagnostics,
     "baselines": _stub_phase("tactic.backtest.baselines", "run_baselines"),
     "infra": _stub_phase("tactic.regime.bocpd_t", "BOCPDt"),
-    "train": _stub_phase("tactic.models.train", "train"),
+    "train": _train,
     "aggregate": _stub_phase("tactic.agg.aa", "AggregatingAlgorithm"),
     "decide": _stub_phase("tactic.portfolio.gp_aim", "gp_step"),
-    "backtest": _stub_phase("tactic.backtest.engine", "run_backtest"),
+    "backtest": _backtest,
     "stress": _stub_phase("tactic.stress.run_stress", "run"),
     "firewall": _stub_phase("tactic.validation.firewall", "run"),
-    "reports": _stub_phase("tactic.reports.render", "render_final_report"),
+    "reports": _reports,
 }
 
 # execution order for `all` (sec18)
@@ -163,10 +196,9 @@ def _run_target(name: str, args) -> int:
         print(f"report: {kg.report_path}")
         print("(A halted build is a SUCCESSFUL run of PLAN.md, sec0.3.10.)")
         return 0
-    except NotImplementedError as nie:
-        print(f"\n[{name}] scaffold boundary reached: {nie}")
-        print("This phase is scaffolded but not yet implemented. Stopping cleanly.")
-        return 3
+    except NotImplementedError:
+        print(f"[{name}] not yet implemented — skipping (scaffold stub).")
+        return 0  # skip stubs so `all` flows through to the implemented phases
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -177,6 +209,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--full", action="store_true", help="full candidate universe")
     ap.add_argument("--symbols", nargs="+", default=None)
     ap.add_argument("--sample-every", type=int, default=5)
+    ap.add_argument("--model", default="f4", choices=["f3", "f4"], help="expert to train")
+    ap.add_argument("--epochs", type=int, default=25)
+    ap.add_argument("--seeds", type=int, default=1)
     args = ap.parse_args(argv)
 
     if args.target == "test":

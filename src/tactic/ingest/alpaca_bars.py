@@ -76,16 +76,20 @@ def ingest(symbols: list[str], start: str | None = None, end: str | None = None,
         for adj in adjustments:
             key = f"{sym}:{adj}"
             out = bars_raw / f"{sym}_{adj}.parquet"
-            if manifest.get(key) == "ok" and out.exists():
+            rec = manifest.get(key)
+            # resume only if a prior fetch covered AT LEAST the requested [start, end] range
+            cached_ok = (isinstance(rec, dict) and rec.get("status") == "ok" and out.exists()
+                         and rec.get("start", "9999") <= start and rec.get("end", "0000") >= end)
+            if cached_ok:
                 all_frames.append(pd.read_parquet(out))
                 continue
             df = fetch_symbol_bars(sym, start, end, adj)
             if len(df):
                 write_parquet(df, out)
                 all_frames.append(df)
-                manifest[key] = "ok"
+                manifest[key] = {"status": "ok", "start": start, "end": end}
             else:
-                manifest[key] = "no_data"
+                manifest[key] = {"status": "no_data", "start": start, "end": end}
             _save_manifest(manifest)
     _save_manifest(manifest)
 
