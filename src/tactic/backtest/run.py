@@ -40,9 +40,13 @@ def _spread(entity_dates) -> dict:
 
 # ---------- strategy ----------
 def backtest(preds: pd.DataFrame, prices: pd.DataFrame, k_buy=5, k_hold=8,
-             no_trade_bps=25) -> pd.DataFrame:
+             no_trade_bps=25, start_date=None, end_date=None) -> pd.DataFrame:
     preds = preds.copy()
     preds["date"] = pd.to_datetime(preds["date"]).dt.date
+    if start_date is not None:
+        preds = preds[preds["date"] >= pd.to_datetime(start_date).date()]
+    if end_date is not None:
+        preds = preds[preds["date"] <= pd.to_datetime(end_date).date()]
     roo = _open_to_open(prices)
     sprd = _spread(preds[["entity", "date"]])
 
@@ -121,6 +125,24 @@ def metrics(bt: pd.DataFrame) -> dict:
             "avg_turnover": float(bt["turnover"].mean()),
             "avg_cost_bps": float(bt["cost"].mean() * 1e4),
             "n_days": n, "avg_names_held": float(bt["n_held"].mean())}
+
+
+def metrics_by_year(bt: pd.DataFrame) -> pd.DataFrame:
+    """Per-calendar-year strategy vs SPY (CAGR-equivalent annual return, Sharpe, maxDD)."""
+    bt = bt.copy()
+    bt["year"] = pd.to_datetime(bt["date"]).dt.year
+    rows = []
+    for y, g in bt.groupby("year"):
+        r, spy = g["ret_net"].to_numpy(), g["spy"].to_numpy()
+        eq, eqs = np.cumprod(1 + r), np.cumprod(1 + spy)
+        rows.append({
+            "year": int(y), "n_days": len(g),
+            "strat_return": float(eq[-1] - 1), "spy_return": float(eqs[-1] - 1),
+            "strat_sharpe": float(r.mean() / r.std(ddof=1) * np.sqrt(ANN)) if r.std() > 0 else np.nan,
+            "spy_sharpe": float(spy.mean() / spy.std(ddof=1) * np.sqrt(ANN)) if spy.std() > 0 else np.nan,
+            "strat_maxdd": _max_dd(eq), "spy_maxdd": _max_dd(eqs),
+        })
+    return pd.DataFrame(rows)
 
 
 def predictor_stats(preds: pd.DataFrame, prices: pd.DataFrame) -> dict:
