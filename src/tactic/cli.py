@@ -81,6 +81,44 @@ def _stub_phase(modpath: str, fn: str):
     return runner
 
 
+# --- implemented phases (Phase 2-5) ---
+def _universe(args):
+    from .universe.build_universe import build_universe
+    from .universe.delistings import build_terminal_returns
+    cfg = load_config()
+    term = build_terminal_returns(cfg)
+    # Gate G0b (soft): unknown terminal types < 5% of exits
+    if len(term):
+        frac_unknown = float((term["terminal_type"] == "unknown").mean())
+        from .common.gates import evaluate
+        evaluate("G0b", passed=frac_unknown < 0.05, value=frac_unknown, threshold=0.05,
+                 interpretation="Too many exits have unknown terminal returns (survivorship risk).",
+                 next_step="Improve delisting reconciliation or report the bias bound.", soft=True)
+    uni = build_universe(cfg)
+    tradable = int(uni["tradable"].sum())
+    print(f"[universe] {len(term)} exits, {tradable} tradable entity-days")
+
+
+def _costs(args):
+    from .costs.spreads import build_spread_surface
+    surf = build_spread_surface(cfg=load_config())
+    print(f"[costs] spread surface: {len(surf)} entity-days, "
+          f"median blend {surf['s_blend'].median()*1e4:.1f} bps")
+
+
+def _labels(args):
+    from .labels.build_labels import build_labels
+    lab = build_labels(load_config())
+    print(f"[labels] {len(lab)} entity-days; auction frac "
+          f"{(lab['label_source'] == 'auction').mean():.2%}")
+
+
+def _diagnostics(args):
+    from .diagnostics.run_diagnostics import run
+    res = run(load_config())
+    print(f"[diagnostics] G1 pass={res['g1_pass']} (max_ic={res['max_ic']:.4f})")
+
+
 # target -> callable
 PHASES: dict[str, object] = {
     "setup": _setup,
@@ -88,11 +126,11 @@ PHASES: dict[str, object] = {
     "data-factors": _data_factors,
     "data-universe": _data_universe,
     "day1-audits": _day1,
-    "universe": _stub_phase("tactic.universe.build_universe", "build_universe"),
-    "costs": _stub_phase("tactic.costs.spreads", "build_spread_surface"),
-    "labels": _stub_phase("tactic.labels.build_labels", "build_labels"),
+    "universe": _universe,
+    "costs": _costs,
+    "labels": _labels,
     "features": _stub_phase("tactic.features.build_features", "build_features"),
-    "diagnostics": _stub_phase("tactic.diagnostics.run_diagnostics", "run"),
+    "diagnostics": _diagnostics,
     "baselines": _stub_phase("tactic.backtest.baselines", "run_baselines"),
     "infra": _stub_phase("tactic.regime.bocpd_t", "BOCPDt"),
     "train": _stub_phase("tactic.models.train", "train"),
@@ -107,7 +145,9 @@ PHASES: dict[str, object] = {
 # execution order for `all` (sec18)
 ALL_ORDER = [
     "setup", "data-alpaca", "data-factors", "data-universe", "day1-audits",
-    "universe", "costs", "labels", "features", "diagnostics", "baselines",
+    # costs precedes universe: the universe spread filter (sec4.2) consumes the Phase-3
+    # spread surface. (PLAN.md sec18 lists universe first; this resolves the data dependency.)
+    "costs", "universe", "labels", "features", "diagnostics", "baselines",
     "infra", "train", "aggregate", "decide", "backtest", "stress",
     "firewall", "reports",
 ]

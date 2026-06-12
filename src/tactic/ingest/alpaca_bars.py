@@ -95,10 +95,10 @@ def ingest(symbols: list[str], start: str | None = None, end: str | None = None,
     union = union.drop_duplicates(subset=["symbol", "date", "adjustment"]).sort_values(
         ["symbol", "date", "adjustment"]
     )
-    out_dir = CURATED / "prices_daily"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    write_parquet(union, out_dir / "prices_daily.parquet")
-    return out_dir
+    CURATED.mkdir(parents=True, exist_ok=True)
+    out = CURATED / "prices_daily.parquet"
+    write_parquet(union, out)  # flat file; sidecar lives beside it, not inside a dataset dir
+    return out
 
 
 def _cli() -> None:

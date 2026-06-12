@@ -17,12 +17,23 @@ run** (§0.3.10).
 | Layer | State |
 |-------|-------|
 | Phase 0 — scaffold, registry, gates, contracts, IO, calendar | **implemented + tested** |
-| Phase 1 — ingestion (Alpaca bars/auctions/assets/CA, French factors, Wikipedia, EDGAR), Day-1 audits | **implemented** |
-| Costs (cost model, break-even), labels math, MODWT, quantile/pinball, DSR, DM, accounting | **implemented + tested** |
-| Phases 2–14 — universe, spreads surface, features, diagnostics, experts/training, aggregation, decision, backtest, stress, firewall, reports | **scaffolded** (typed stubs; raise at the boundary) |
+| Phase 1 — ingestion (Alpaca bars/auctions/assets/CA, French factors, Wikipedia, EDGAR), Day-1 audits (G0a) | **implemented** (live-verified) |
+| Phase 2 — universe (PIT membership), delistings/terminal returns (G0b) | **implemented + tested** |
+| Phase 3 — spread surface (Corwin-Schultz, Abdi-Ranaldo, EDGE blend) + cost model/break-even | **implemented + tested** |
+| Phase 4 — labels (A.1 components, z_top, EWMA σ, vol-standardized y) | **implemented + tested** |
+| Phase 5 — diagnostics (variance ratio, IC decay, tug-of-war) + gate G1/G1b | **implemented + tested** |
+| Math libs — MODWT, quantile/pinball, DSR, Diebold-Mariano, NAV accounting | **implemented + tested** |
+| Phase 4 features tensor, Phases 6–14 (baselines, experts/training, aggregation, decision, backtest, stress, firewall, reports) | **scaffolded** (typed stubs; halt at boundary) |
 | Vertex AI submission (custom-jobs, Vizier spec, packaging) | **implemented** |
 
 `make all` runs the §18 order and stops cleanly at the first scaffold boundary or kill gate.
+End-to-end verified on a 15-symbol × 5-year real slice: ingest → costs → labels (99.9% auction
+coverage) → universe → diagnostics (G1 passes, max |IC| ≈ 0.025).
+
+> Calibration note: the spread blend is the spec'd median of three *daily-OHLC* estimators
+> (PLAN.md §5.1); Corwin-Schultz/Abdi-Ranaldo run high on liquid daily bars, so blended
+> medians are conservative. Tighten with minute bars or an EDGE-weighted blend when wiring
+> the live loop.
 
 ## Quickstart
 
