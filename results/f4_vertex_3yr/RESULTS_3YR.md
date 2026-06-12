@@ -44,3 +44,25 @@ Rank-IC 0.0140 (IR 0.071), hit 52.5%, pinball 1.684, interval coverage 74.8%/86.
 - Consistent positive rank-IC (~0.014) and calibrated intervals across 3 years.
 - Verdict: modest positive alpha (+3.5%/yr), beta ~1; outperforms on return, not on Sharpe.
   Deployability still needs the full PLAN firewall (CPCV/DSR/SPA + RC-Kelly sizing to cut vol).
+
+## Deflated Sharpe Ratio (gate G8) — FAILS
+
+DSR (de Prado, Appendix A.9) deflates the observed Sharpe for (a) number of trials tried,
+(b) non-normal returns, (c) sample length. Computed on the 3-year daily net returns
+(daily SR 0.070 ≈ 1.12 ann.; skew 0.21, **kurtosis 8.35**, T=765; trial-Sharpe dispersion
+estimated from the variants actually evaluated).
+
+| N (trials) | SR0 (daily) | DSR | G8 (>0.95)? |
+|---|---|---|---|
+| 5 | 0.048 | 0.73 | FAIL |
+| 10 | 0.064 | 0.57 | FAIL |
+| 20 | 0.077 | 0.43 | FAIL |
+| 50 | 0.092 | 0.28 | FAIL |
+| 100 | 0.102 | 0.19 | FAIL |
+
+**Verdict: DSR < 0.95 at every plausible trial count → gate G8 FAILS.** After accounting for
+the ~7–10 model/universe/window variants tried and the fat-tailed daily returns, the OOS
+Sharpe (1.12) is statistically indistinguishable from the best a lucky search would produce
+(SR0 ≈ 1.01 ann. at N=10). The strategy's raw Sharpe is already below SPY's (1.36), so there is
+no evidence of risk-adjusted skill. Per PLAN §0.3.10 this is a valid **negative result** — the
+anti-overfitting firewall working as designed: do not deploy.

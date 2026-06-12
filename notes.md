@@ -199,3 +199,15 @@ Full pipeline ingest->features->experts->train(Vertex)->OOS backtest vs SPY, wit
 curves, predictor stats, ablation, and DM significance. f4 beats SPY economically (CAGR 41.9% vs
 24.1%, Sharpe 1.82 vs 1.68, alpha +9.1%) and beats f3 significantly (G5 p=0.0099). Breadth thesis
 demonstrated (15 vs 83 names). All honest caveats stated. 141 tests green. Pushed to GitHub.
+
+---
+
+## Deflated Sharpe Ratio (gate G8) on 3yr OOS — FAILS (honest negative result)
+
+DSR on 3yr daily net returns (SR_daily 0.070, skew 0.21, kurtosis 8.35, T=765; var_sr_trials est
+from observed variant Sharpes). DSR by N: 5->0.73, 10->0.57, 20->0.43, 50->0.28, 100->0.19. All
+< 0.95 -> **G8 FAIL**. SR0(N=10)=0.064 daily (~1.01 ann) ~= observed -> Sharpe indistinguishable
+from best-of-N luck. Strategy Sharpe 1.12 < SPY 1.36 anyway. Ledger auto-N=7 (undercounts; Vertex
+trials logged ephemerally). CONCLUSION: positive raw-return alpha but NO risk-adjusted skill that
+survives multiple-testing deflation. Valid PLAN negative result (do not deploy). This is exactly
+what DSR/anti-overfitting gates exist to catch.
