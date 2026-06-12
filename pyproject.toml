@@ -3,7 +3,7 @@ name = "tactic-mob"
 version = "4.0.0"
 description = "TACTIC-MoB v4 — Transaction-cost-Aware, Component-decomposed, Throttled Mixture-of-Betting-experts daily US-equity backtest pipeline."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 license = { text = "Proprietary" }
 authors = [{ name = "Julian Juan", email = "juliansjuan08@gmail.com" }]
 

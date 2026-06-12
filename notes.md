@@ -109,3 +109,39 @@ QA/QC every step, produce QuantConnect-style results + graphs, compare vs SPY bu
   epochs=25 seeds=5. Artifacts -> gs://gmda-vertex-c779f701-uscentral1/runs/f4_vertex_20260612_104701.
 - Parallel safety net: full f4 (25ep x 3seed) also training locally for immediate results.
 - Next: wait (cooldown) for Vertex job; poll status; download artifacts; render; compare to local.
+
+---
+
+## Full local f4 run — HONEST RESULT (15-name universe)
+
+Run f4_20260612_104415 (25 epochs, 3 seeds, early-stopped, val_pinball 1.633). OOS = 2023.
+
+| Metric | TACTIC-MoB (net) | SPY B&H |
+|---|---|---|
+| Total return | 20.7% | 22.9% |
+| CAGR | 21.8% | 24.1% |
+| Sharpe | 1.30 | 1.68 |
+| Sortino | 2.02 | 2.75 |
+| Max drawdown | -16.7% | -9.6% |
+| Win rate | 53.1% | 51.5% |
+
+Predictor (OOS): pinball 1.655, **rank-IC 0.0023 (IR 0.007)**, hit 47.6%, coverage 73.7%/85.9%.
+
+**Interpretation (important, not cherry-picked):** with proper training the model minimizes val
+pinball but OOS cross-sectional **IC ~ 0** -> NO reliable edge on 15 mega-caps; it slightly
+*under*performs SPY net. The earlier 3-epoch "46% / Sharpe 1.99" was noise from an undertrained
+model that happened to overweight 2023 winners. This is the anti-overfitting framework working
+as designed: a tiny universe has almost no cross-sectional breadth (Fundamental Law: IR ~ IC*sqrt(BR)).
+Coverage 74/86% shows the quantile heads are roughly calibrated. Results copied to
+results/f4_local_15names/ (committed).
+
+**Action:** scale the universe to ~80 liquid S&P names for real cross-sectional breadth; retrain.
+Ingest of ~80 names launched in background.
+
+## Vertex — fix + resubmit
+- First full job FAILED: image pytorch-xla.2-4 is **Python 3.10**, pyproject required >=3.11 ->
+  pip refused. Vertex also installs the package `--no-deps`.
+- Fix: requires-python ">=3.10"; vertex_entry now pip-installs its light runtime deps
+  (pandas/pyarrow/pyyaml/scipy/matplotlib) defensively. Rebuilt + reuploaded sdist.
+- Smoke validation job submitted (job 7466498673535352832, n1-standard-4, epochs8 seeds2) against
+  the already-uploaded 15-name data to confirm the fixed path returns artifacts.

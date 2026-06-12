@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "<string>", line 4, in <module>
+  File "C:\Users\bubga.JULIAN-LAPTOPE2\OneDrive\Desktop\coding\currect QR\src\tactic\models\train.py", line 155, in train
+    hist.to_csv(run_dir / "loss_history.csv", index=False)
+  File "C:\Users\bubga.JULIAN-LAPTOPE2\miniforge3\Lib\site-packages\pandas\util\_decorators.py", line 333, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bubga.JULIAN-LAPTOPE2\miniforge3\Lib\site-packages\pandas\core\generic.py", line 3967, in to_csv
+    return DataFrameRenderer(formatter).to_csv(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bubga.JULIAN-LAPTOPE2\miniforge3\Lib\site-packages\pandas\io\formats\format.py", line 1014, in to_csv
+    csv_formatter.save()
+  File "C:\Users\bubga.JULIAN-LAPTOPE2\miniforge3\Lib\site-packages\pandas\io\formats\csvs.py", line 251, in save
+    with get_handle(
+         ^^^^^^^^^^^
+  File "C:\Users\bubga.JULIAN-LAPTOPE2\miniforge3\Lib\site-packages\pandas\io\common.py", line 749, in get_handle
+    check_parent_directory(str(handle))
+  File "C:\Users\bubga.JULIAN-LAPTOPE2\miniforge3\Lib\site-packages\pandas\io\common.py", line 616, in check_parent_directory
+    raise OSError(rf"Cannot save file into a non-existent directory: '{parent}'")
+OSError: Cannot save file into a non-existent directory: 'C:\Users\bubga.JULIAN-LAPTOPE2\OneDrive\Desktop\coding\currect QR\reports\runs\f4_20260612_104301'

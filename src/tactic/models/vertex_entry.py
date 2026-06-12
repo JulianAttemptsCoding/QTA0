@@ -32,6 +32,11 @@ def main(argv=None):
     ap.add_argument("--val_end", default="2022-12-31")
     a = ap.parse_args(argv)
 
+    # Vertex installs the package with --no-deps; defensively install the lightweight runtime
+    # deps the training+render path needs (torch/numpy already in the pytorch-xla image).
+    subprocess.call([sys.executable, "-m", "pip", "install", "-q",
+                     "pandas", "pyarrow", "pyyaml", "scipy", "matplotlib"])
+
     # point the package at writable container paths BEFORE importing config
     work = Path("/tmp/tactic"); cfg_dir = work / "configs"; data_dir = work / "data"
     (data_dir / "curated").mkdir(parents=True, exist_ok=True)
