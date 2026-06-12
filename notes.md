@@ -291,3 +291,41 @@ Root causes: (1) val regime=single calm 2021, (2) chronological split wastes sca
 (3) constant-collapse + top-5 book. Fix: CPCV multi-regime OOS (2022 testable in 7/28 folds),
 S1 baseline-beating sanity gate, ranking aux loss, dollar-neutral L/S + equal-weight-univ bench.
 Data floor=2016 (Alpaca hard; Stooq quarantined). Full handoff plan at repo root.
+
+---
+
+## 2026-06-13 — RESEARCH: free deep-history data sources (can we go before 2016? should we?)
+
+**Question:** free+public source with deeper history + high-enough time resolution? worth it?
+
+**Probes (QA'd live):**
+- **Alpaca SIP** = hard floor 2016-01-04 (re-confirmed). No earlier.
+- **Stooq** programmatic CSV = BLOCKED ("page you requested... exceeded" rate-limit/captcha). Repo
+  already quarantines Stooq → manual bulk only. Not automatable.
+- **yfinance (Yahoo)** = WORKS, free, no key: AAPL/MSFT/GE daily back to **1990-01-02** (9179 rows),
+  SPY 1993 (ETF inception), current to 2026-06-12. Daily OHLCV + Adj Close. ~36yr depth.
+- **Survivorship test (decisive):** yfinance returns **EMPTY for delisted/dead tickers** —
+  LEH, WCOM, ENE, BSC, WAMUQ, CIT, ABK, DYN, EK, TYC, old-DELL all 0 rows. Only survivors kept.
+
+**Resolution verdict:** strategy is DAILY (L=64 daily bars + daily labels). Daily free history is
+*sufficient resolution*. Intraday/minute only needed for cost/exec refinement, not the signal.
+→ Resolution is NOT the blocker.
+
+**Survivorship verdict (the real issue):** free deep sources (yfinance, per-symbol Stooq/Tiingo)
+are **survivorship-biased** — dead tickers purged. A 2000-2015 backtest on them would be upward-
+biased (you'd "never have held Lehman into 2008"). Survivorship-safe deep equity data (CRSP,
+Shardar SEP/SFP) is **PAID**. No free survivorship-safe deep source exists. Ken French factors are
+free to 1926 but are portfolio returns (market-state context), not tradeable single-name picks.
+
+**Would deeper history be GOOD?**
+- For TRAINING/CV *regime diversity*: YES in principle — 2016-2026 has only ~2 bears (2020,2022);
+  pre-2016 adds dot-com bust + 2008 GFC + 2011 + 2015-16. Big regime gain.
+- For the honest OOS/backtest: **NO** — survivorship bias corrupts the score, violating the whole
+  anti-overfitting purpose (PLAN). Bias in *evaluation* is fatal; bias in *pretraining* is mild.
+- **Conclusion:** free deep history is usable ONLY as clearly-labeled TRAIN-ONLY regime
+  augmentation (pretrain on 2000-2015 surviving-name daily bars to expose GFC/dot-com vol), with
+  the CPCV OOS kept strictly on SIP-clean, delisting-aware 2016-2026 (Alpaca captures inactive
+  assets + corp actions). Modest, optional upside; real risks (adj-quality errors, the splice seam,
+  non-stationarity). Repo's existing quarantine invariant already encodes this — honor it.
+- **Recommendation:** keep CPCV-on-2016-2026 as PRIMARY. Treat yfinance deep history as an OPTIONAL
+  augmented-pretrain experiment, never touching OOS. Net: not worth blocking on; document + offer.

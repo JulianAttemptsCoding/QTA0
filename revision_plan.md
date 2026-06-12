@@ -45,11 +45,12 @@ a ranking objective + a breadth/market-neutral portfolio.**
 
 - **Data floor is 2016-01-04.** Alpaca SIP returns nothing before it (probed AAPL at 2004/2010/2015
   → earliest bar always 2016-01-04). This is a hard vendor floor.
-- **No pre-2016 history in training.** Deep history (Stooq) exists ONLY in
-  `data/diagnostic_quarantine/` and is **forbidden** from joining curated features — enforced by
-  `tests/test_quarantine_isolation.py` and PLAN §0.3 non-negotiables. Do NOT wire Stooq into the
-  panel. (If a future owner wants pre-2016, that is a separate project requiring a survivorship-safe
-  delisted universe + split/adjustment reconciliation + a cost/auction surrogate; out of scope here.)
+- **No pre-2016 history in the OOS/clean panel.** Deep history (Stooq) in
+  `data/diagnostic_quarantine/` is **forbidden** from joining curated features — enforced by
+  `tests/test_quarantine_isolation.py` and PLAN §0.3. Do NOT wire deep history into the OOS panel.
+  Free deeper daily data *does* exist (yfinance, 1990+) but is **survivorship-biased**; it may be
+  used ONLY for an optional, clearly-labeled train-only pretraining ablation (see **§1A**), never for
+  scoring. A survivorship-safe deep source (CRSP/Sharadar) is paid and out of scope.
 - **Usable span = 2016-01-04 → 2026-06-11** (already ingested for all 196 names; bars+auctions+
   labels+features+spreads present). User target end 2026-06-10 is already covered.
 - **PIT / fit-scope discipline.** Feature standardization and any target normalization are fit on
@@ -63,6 +64,57 @@ a ranking objective + a breadth/market-neutral portfolio.**
 - A naive "train≤2021 / OOS 2022+" is the design that just failed and is **rejected**: training then
   contains no sustained bear (only the 3-week 2020 crash) and the lone val year is calm. Do not
   rebuild that.
+
+---
+
+## 1A. Free deep-history data — research findings + decision (2026-06-13)
+
+**Question asked:** can we get *free, public* data deeper than 2016 at high-enough time resolution,
+and would it help? **Answer: deeper free daily data exists, but it is survivorship-biased, so use it
+(at most) for TRAIN-ONLY augmentation — never for the OOS.**
+
+**What was probed (live, QA'd):**
+| Source | Free? | Depth | Resolution | Verdict |
+|---|---|---|---|---|
+| Alpaca SIP | yes | **2016-01-04 floor** | daily/minute | hard floor; primary clean source |
+| Stooq (per-symbol CSV) | yes | deep | daily | **blocked** programmatically (rate-limit/captcha); manual bulk only; repo quarantines it |
+| **yfinance (Yahoo)** | yes, no key | **1990+** (AAPL/MSFT/GE 9179 daily rows; SPY 1993) | daily (+Adj Close) | works; deep; **survivorship-biased** |
+| Tiingo free | key | deep | daily | active-ticker focused; partial delisted; not survivorship-safe |
+| Nasdaq Data Link "WIKI" | yes | frozen 2018 | daily | discontinued + biased; dead end |
+| Ken French factors | yes | **1926+** | daily | portfolio returns (regime/market-state context), NOT single-name tradeable |
+| CRSP / Sharadar SEP-SFP | **NO (paid)** | deep, survivorship-safe | daily | the only clean deep option; out of scope (not free) |
+
+**Resolution is sufficient, and is NOT the blocker.** The strategy is daily (L=64 daily bars + daily
+open→open labels). Free daily history (yfinance, 1990+) has the native resolution the model needs.
+Minute data would only refine the cost/execution layer, not the signal.
+
+**The blocker is survivorship bias (proven).** yfinance returns **0 rows for delisted/dead tickers**
+— tested LEH, WCOM, ENE, BSC, WAMUQ, CIT, ABK, DYN, EK, TYC, old-DELL → all EMPTY; only survivors
+remain. A pre-2016 backtest on such data is upward-biased (you would "never have held Lehman into
+2008"). **No free survivorship-safe deep equity source exists** (CRSP/Sharadar are paid; WIKI/Tiingo
+are biased too). Alpaca *does* capture delistings (inactive `assets_snapshots` + corporate actions)
+but only from 2016.
+
+**Would it be good to have?**
+- *Regime diversity (train/CV):* genuinely yes — 2016-2026 has only ~2 sustained bears (2020, 2022);
+  pre-2016 adds the dot-com bust, **2008 GFC**, 2011 EU crisis, 2015-16 selloff. More stress regimes
+  to learn from.
+- *Honest evaluation:* **no** — survivorship bias in the OOS would fake the score and defeat the
+  entire anti-overfitting purpose (PLAN §0.3). Bias in *evaluation* is fatal; bias in *pretraining*
+  is mild, and is further neutralized by the per-date **cross-sectional demeaning** in §4.3 (which
+  removes the survivor up-drift; the label is a 1-day cross-sectional relative return, not a
+  long-horizon absolute one, so survivorship sensitivity is low to begin with).
+
+**DECISION:**
+1. **Primary stays CPCV on the SIP-clean, delisting-aware 2016-2026 window.** Do not put free deep
+   history into the OOS. Keep `tests/test_quarantine_isolation.py` honored.
+2. **OPTIONAL experiment (clearly labeled, train-only):** an *augmented-pretrain* path that pretrains
+   f4 on yfinance 1990-2015 **surviving-name** daily bars (features+demeaned labels only), then
+   fine-tunes + validates + tests strictly on the clean 2016-2026 CPCV. Report as an ablation:
+   "does GFC/dot-com pretraining improve clean-window CPCV metrics?" If yes, modest robustness win;
+   if no, drop it. This NEVER touches OOS scoring and must be flagged as survivorship-biased input.
+3. **Not worth blocking on.** The clean-data CPCV redesign (§3) is the main lever. Pretraining is a
+   nice-to-have ablation, not a dependency.
 
 ---
 
@@ -241,6 +293,16 @@ All of these are currently **stubs** — implement what you use:
   still fails, iterate on `λ_rank`/capacity (val-selected) before spending Vertex on CPCV. **Never
   consult OOS to make these choices.**
 
+**STEP 2.5 — OPTIONAL augmented-pretrain ablation (§1A, train-only, skippable).**
+- Only if pursuing the deep-history experiment. Build a SEPARATE quarantined panel from yfinance
+  1990-2015 for the survivors of the 196-name list (`yf.download(sym, start='1990-01-01',
+  end='2016-01-01', auto_adjust=False)`); compute the same features + **cross-sectionally demeaned**
+  labels; keep it in `data/diagnostic_quarantine/` (do NOT join to curated). Pretrain f4 on it, then
+  load weights as init for the §3 CPCV training on clean 2016-2026.
+- **QA2.5:** assert the pretrain panel never enters any OOS/test set; assert the quarantine-isolation
+  test still passes; report it as an ablation row ("pretrain on/off") on clean CPCV metrics only.
+- If it does not improve clean-window metrics, DROP it. Never block the main path on this.
+
 **STEP 3 — implement CPCV splitter + driver (§3A).**
 - Implement `cpcv_paths` (returns the 28 train/test group partitions with purge+embargo masks).
 - Add a CPCV training driver `src/tactic/models/train_cpcv.py` that, per fold: builds the panel,
@@ -310,6 +372,7 @@ All of these are currently **stubs** — implement what you use:
 | `src/tactic/validation/walk_forward.py` | IMPLEMENT `make_folds` (stub; for §3B fallback) |
 | `src/tactic/validation/pbo.py` | IMPLEMENT PBO (stub today) |
 | `src/tactic/models/train_cpcv.py` | NEW — CPCV driver + combined-OOS aggregation |
+| `src/tactic/ingest/yfinance_deep.py` | NEW (OPTIONAL, §2.5) — yfinance 1990-2015 survivors → `data/diagnostic_quarantine/` only; pretrain panel. Never joins curated. |
 | `src/tactic/backtest/run.py` | EDIT — add dollar-neutral L/S book + equal-weight-universe benchmark + per-regime grouping |
 | `vertex/vertex_entry.py`, `vertex/train_on_vertex.py` | EDIT — `--cv=cpcv` passthrough, fold fan-out/loop |
 | `configs/v1.yaml` | (already has cpcv_groups/cpcv_test/purge/embargo) — add `lambda_rank` if desired |
