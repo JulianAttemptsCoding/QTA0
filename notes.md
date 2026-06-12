@@ -272,3 +272,22 @@ Backtest k_buy=20/k_hold=60 (spec band), net of costs:
 **CONCLUSION:** honest negative — small +IC, mildly defensive (wins down-year, lower vol/DD), but
 does NOT beat SPY over a longer wider bear-inclusive OOS; gap within noise. Earlier 1yr/83-name
 "win" was window+concentration luck. Report results/f4_vertex_196_oos2022/RESULTS_OOS2022.md.
+
+### DIAGNOSIS — "what went wrong" (validation comparison)
+1. **Model ~= constant.** q50 per-day cross-sectional spread = 0.018 vs target std 1.10 → ranks
+   names almost identically. Val pinball 1.6044 vs BASELINE (train uncond quantiles) 1.6053 =
+   **0.06% improvement**; OOS 1.6677 vs 1.6740 = 0.4%. Conditional model barely beats a constant.
+2. **Regime shift train/val/OOS:** kurt train 18.2 / val(2021) 5.3 / OOS 10.2; std 1.083/1.037/1.103.
+   Val 2021 = calm melt-up. Best-val hit ~epoch4 then val rose → early-stop locked a near-unconditional
+   underfit ckpt. 2021 is a poor proxy for 2022 bear + 2023-25 narrow bull.
+3. **Target near-efficient:** OOS rank-IC by yr 2022 +.020 / 2023 +.004 / 2024 +.034 / 2025 +.005 /
+   2026 +.005; IC_IR all <0.19. Tiny inconsistent signal; pinball dominated by irreducible variance.
+4. **Backtest:** small +IC + equal-weight top-K cannot track cap-weighted SPY led by few mega-caps
+   2023-25 → net loss. Root cause = (1)+(3): almost no learnable daily cross-sectional signal, and
+   val-year regime mismatch made early-stop select an underfit model.
+
+### revision_plan.md created (regime-robust re-validation)
+Root causes: (1) val regime=single calm 2021, (2) chronological split wastes scarce regimes,
+(3) constant-collapse + top-5 book. Fix: CPCV multi-regime OOS (2022 testable in 7/28 folds),
+S1 baseline-beating sanity gate, ranking aux loss, dollar-neutral L/S + equal-weight-univ bench.
+Data floor=2016 (Alpaca hard; Stooq quarantined). Full handoff plan at repo root.
