@@ -28,8 +28,9 @@ def main(argv=None):
     ap.add_argument("--model", default="f4")
     ap.add_argument("--epochs", type=int, default=25)
     ap.add_argument("--seeds", type=int, default=5)
-    ap.add_argument("--train_end", default="2021-12-31")
-    ap.add_argument("--val_end", default="2022-12-31")
+    ap.add_argument("--train_end", default="2020-12-31")
+    ap.add_argument("--val_end", default="2021-12-31")
+    ap.add_argument("--patience", type=int, default=5)
     a = ap.parse_args(argv)
 
     # Vertex installs the package with --no-deps; the pytorch-xla image already has
@@ -59,7 +60,8 @@ def main(argv=None):
             raise
 
     r = train(model_kind=a.model, epochs=a.epochs, seeds=a.seeds,
-              train_end=a.train_end, val_end=a.val_end, run_id="vertex_run")
+              train_end=a.train_end, val_end=a.val_end, run_id="vertex_run",
+              patience=a.patience)
     try:
         from ..reports.results import render_run
         render_run(r["run_id"])

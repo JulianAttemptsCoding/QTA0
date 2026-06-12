@@ -26,7 +26,15 @@ def _entity_channels(g: pd.DataFrame) -> pd.DataFrame:
     o, h, l, c = (np.log(g[x].to_numpy()) for x in ("o", "h", "l", "c"))
     v = g["v"].to_numpy(float)
     n = g["n"].to_numpy(float) if "n" in g else np.full(len(g), np.nan)
-    vw = np.log(g["vw"].to_numpy()) if "vw" in g else c
+    # guard vw<=0 (missing/zero VWAP would make log(vw)=-inf and poison the channel): fall
+    # back to close where vw is non-positive or missing.
+    if "vw" in g:
+        vw_raw = g["vw"].to_numpy(float)
+        cl_raw = g["c"].to_numpy(float)
+        vw_raw = np.where((vw_raw > 0) & np.isfinite(vw_raw), vw_raw, cl_raw)
+        vw = np.log(vw_raw)
+    else:
+        vw = c
 
     ret = np.concatenate([[np.nan], np.diff(c)])                 # ch01 log close return
     rng = h - l                                                  # ch02 intraday log range

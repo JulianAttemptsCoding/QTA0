@@ -211,3 +211,36 @@ from best-of-N luck. Strategy Sharpe 1.12 < SPY 1.36 anyway. Ledger auto-N=7 (un
 trials logged ephemerally). CONCLUSION: positive raw-return alpha but NO risk-adjusted skill that
 survives multiple-testing deflation. Valid PLAN negative result (do not deploy). This is exactly
 what DSR/anti-overfitting gates exist to catch.
+
+---
+
+## 2026-06-12 — UNIVERSE + HISTORY EXPANSION (user req: ignore gates, note only)
+
+**Goal:** train data as early as possible; OOS = 2022-01 → now (~2026-06); clean train/val/test;
+≥150 stocks/ETFs; train until val pinball rises while train falls (overfit divergence, keep best-val);
+all heavy on Vertex; gates ignored (noted only).
+
+**Plan/split (new):** train ≤2020-12-31, val 2021 (calendar), test/OOS 2022-01-01 → now.
+Earliest data 2016-01-01 (cfg panel.start; Alpaca SIP floor). ~5yr train / 1yr val / 4.4yr OOS.
+Purge=2 + embargo=5 between regimes (unchanged).
+
+**Universe:** expanded 83 → **196** liquid US large/mid-caps + 17 ETFs (incl SPY benchmark),
+broad sector coverage, no leverage/inverse. List = candidate_symbols.LIQUID_BIG.
+
+**Steps:** (1) ingest Alpaca SIP bars+auctions 2016→now for 196 syms; (2) rebuild costs→labels→
+features; (3) QA panel split; (4) raise epochs/patience to expose overfit divergence, set new
+split, submit f4 to Vertex; (5) poll→download→backtest OOS 2022→now vs SPY (overall + annualized)
++ predictor stats + graphs. Gates computed & noted, not enforced.
+
+### Ingest + panel rebuild results
+- Bars: 196 syms, **2016-01-04 → 2026-06-11**, 1,022,982 rows, SPY 2625 days, 0 syms <500 days.
+- Auctions: 511,248 rows through 2026-06-11.
+- costs/labels/features rebuilt: 511,491 entity-day rows, 39 feat cols.
+- **Bugfix:** features ch06 had 398 `-inf` from `log(vw)` where vw=0. Guarded vw<=0/NaN → close.
+  Rebuilt → inf=0.
+- **Panel split QA (build_panel + _split, purge2+embargo5):**
+  - train 2016-07-26 → 2020-12-31 = 1118 date-batches
+  - val   2021-01-13 → 2021-12-31 = 245
+  - OOS   2022-01-12 → 2026-06-09 = 1105 (216,280 entity-rows)
+  - entities/day min/med/max = 192/195/196 (breadth 83→~195).
+- Warmup start 2016-07-26 (126d from 2016-01-04). Clean. Ready for Vertex.

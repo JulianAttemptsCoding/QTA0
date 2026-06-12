@@ -50,6 +50,9 @@ def main():
     ap.add_argument("--seeds", type=int, default=5)
     ap.add_argument("--smoke", action="store_true", help="n1-standard-4 instead of n1-standard-16")
     ap.add_argument("--gpu", action="store_true", help="use the pytorch-xla image (default; torch present)")
+    ap.add_argument("--train_end", default="2020-12-31")
+    ap.add_argument("--val_end", default="2021-12-31")
+    ap.add_argument("--patience", type=int, default=5)
     a = ap.parse_args()
 
     load_dotenv()
@@ -79,7 +82,8 @@ def main():
     image = v.image_gpu
     machine = v.machine_smoke if a.smoke else v.machine_full
     args = (f"--data_uri={data_uri},--out_uri={out_uri},--model={a.model},"
-            f"--epochs={a.epochs},--seeds={a.seeds}")
+            f"--epochs={a.epochs},--seeds={a.seeds},"
+            f"--train_end={a.train_end},--val_end={a.val_end},--patience={a.patience}")
     worker = (f"machine-type={machine},replica-count=1,executor-image-uri={image},"
               f"python-module=tactic.models.vertex_entry")
     cmd = ["gcloud", "ai", "custom-jobs", "create",

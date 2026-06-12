@@ -72,14 +72,17 @@ def _eval_loss(model, batches, mu, sd, taus_t, device):
 
 
 def train_one_seed(model_kind, batches_tr, batches_va, batches_te, mu, sd,
-                   epochs=25, lr=1e-3, seed=0, device="cpu"):
+                   epochs=25, lr=1e-3, seed=0, device="cpu", patience=5):
     torch.manual_seed(seed); np.random.seed(seed)
     model = (F4Model() if model_kind == "f4" else F3Model()).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
     taus_t = torch.tensor(TAUS, dtype=torch.float32, device=device)
 
-    history, best_val, best_state, patience, bad = [], float("inf"), None, 5, 0
+    # `patience`: epochs of no val improvement tolerated before stopping. Set high to let the
+    # train/val curves run PAST the divergence point (train pinball ↓ while val pinball ↑) so the
+    # overfit onset is visible in loss_history; predictions still use the best-val checkpoint.
+    history, best_val, best_state, bad = [], float("inf"), None, 0
     for ep in range(epochs):
         model.train()
         order = np.random.permutation(len(batches_tr))
@@ -120,8 +123,8 @@ def train_one_seed(model_kind, batches_tr, batches_va, batches_te, mu, sd,
 
 
 def train(cfg: dict | None = None, model_kind: str = "f4", epochs: int = 25,
-          seeds: int = 1, train_end="2021-12-31", val_end="2022-12-31",
-          run_id: str | None = None) -> dict:
+          seeds: int = 1, train_end="2020-12-31", val_end="2021-12-31",
+          run_id: str | None = None, patience: int = 5) -> dict:
     cfg = cfg or load_config()
     from ..common.config import CURATED
     feats = pd.read_parquet(CURATED / "features.parquet")
@@ -141,7 +144,8 @@ def train(cfg: dict | None = None, model_kind: str = "f4", epochs: int = 25,
 
     all_hist, pred_frames, val_losses = [], [], []
     for s in range(seeds):
-        h, p, bv = train_one_seed(model_kind, tr, va, te, mu, sd, epochs=epochs, seed=1338 + s)
+        h, p, bv = train_one_seed(model_kind, tr, va, te, mu, sd, epochs=epochs,
+                                  seed=1338 + s, patience=patience)
         all_hist.append(h); pred_frames.append(p.assign(seed=s)); val_losses.append(bv)
         log_trial("hpo", f"{model_kind} seed {s} train", cfg_hash(cfg), study_id=run_id)
 
