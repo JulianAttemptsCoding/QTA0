@@ -63,6 +63,31 @@ edge; the earlier 3-epoch "win" on 15 names was an undertrained-model artifact, 
 
 ---
 
+## 2.5 Ablation (gate G5) and statistical significance
+
+Both experts trained identically on Vertex (83 names, 20 epochs × 3 seeds). f3 = the same
+CI-TCN encoder **without** the cross-sectional attention layer.
+
+| | f4 (with attention) | f3 (no attention) |
+|---|---|---|
+| CAGR | **41.9%** | 1.7% |
+| Sharpe | **1.81** | 0.19 |
+| Max drawdown | -9.2% | -14.3% |
+| OOS rank-IC | **+0.0157** | **−0.0081** |
+| Pinball (OOS) | 1.6698 | 1.6747 |
+
+- **Gate G5 — PASS.** Diebold-Mariano on daily net P&L, f4 vs f3: **stat −2.60, p = 0.0099**
+  (NW lag 10). The one thin cross-sectional attention layer is statistically justified: without
+  it the model has *negative* OOS IC and no edge. This is the PLAN's central thesis confirmed —
+  the deployable signal lives in the cross-section (relative ranking of the date's names), not in
+  per-asset temporal patterns.
+- **f4 vs SPY — economically ahead, not yet statistically separable.** DM on daily net P&L,
+  f4 vs SPY: stat −1.38, **p = 0.17**. Over a single 241-session OOS year the daily-return
+  advantage is real (higher CAGR/Sharpe/Sortino) but **not** significant at 5%. Establishing a
+  PLAN-grade G3 verdict requires multi-year OOS + Romano-Wolf stepdown + Deflated Sharpe over the
+  full universe — those are implemented as library functions (`validation/{dm_test,dsr,spa,pbo}`)
+  and are the next scale-up, not yet run at full breadth.
+
 ## 3. Method (as built; deviations from PLAN.md flagged)
 
 - **Universe:** 83 liquid S&P-500 names, 2019–2023 daily SIP bars + official auctions (Alpaca).

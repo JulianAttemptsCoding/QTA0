@@ -180,3 +180,22 @@ Ingest of ~80 names launched in background.
 - Honest caveats logged: 83 << 400-700 spec breadth; single OOS year (2023, momentum-friendly);
   CPCV/DSR/SPA at scale + RC-Kelly/GP decision layer are the documented next steps before any
   deployability claim.
+
+---
+
+## f3 ablation result + gate G5 (f4 vs f3)
+
+- f3 ablation job 6993902187638161408 SUCCEEDED on Vertex. Downloaded to results/f3_vertex_83names/.
+- **f4 (attention) vs f3 (no attention), 83 names, OOS 2023:**
+  f4: CAGR 41.9%, Sharpe 1.81, IC +0.0157.  f3: CAGR 1.7%, Sharpe 0.19, IC -0.0081 (negative).
+- **Gate G5 PASS:** DM on daily net P&L f4 vs f3 = stat -2.60, **p=0.0099** -> attention layer
+  statistically justified. Confirms PLAN thesis: signal is cross-sectional, not per-asset temporal.
+- **f4 vs SPY DM: stat -1.38, p=0.17** -> economically beats SPY (CAGR/Sharpe) but NOT stat-sig
+  over one 241-day OOS year. Honest: PLAN-grade G3 needs multi-year + Romano-Wolf + DSR at full
+  breadth (library functions exist; not yet run at scale). Logged in FINAL_REPORT section 2.5.
+
+## SUMMARY OF DELIVERABLE
+Full pipeline ingest->features->experts->train(Vertex)->OOS backtest vs SPY, with graphs, train/val
+curves, predictor stats, ablation, and DM significance. f4 beats SPY economically (CAGR 41.9% vs
+24.1%, Sharpe 1.82 vs 1.68, alpha +9.1%) and beats f3 significantly (G5 p=0.0099). Breadth thesis
+demonstrated (15 vs 83 names). All honest caveats stated. 141 tests green. Pushed to GitHub.
