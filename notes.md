@@ -145,3 +145,18 @@ Ingest of ~80 names launched in background.
   (pandas/pyarrow/pyyaml/scipy/matplotlib) defensively. Rebuilt + reuploaded sdist.
 - Smoke validation job submitted (job 7466498673535352832, n1-standard-4, epochs8 seeds2) against
   the already-uploaded 15-name data to confirm the fixed path returns artifacts.
+
+---
+
+## Scaled to 83-name universe + Vertex iteration
+
+- Ingested 83 liquid S&P names (bars+auctions 2019-2023, 208,828 price rows). Rebuilt panel:
+  spreads/labels/features = 104,414 entity-days, 83 entities (features 14.5s).
+- Vertex smoke (fixed py-version) got PAST pip install and ran, but hit **NumPy 2.0 ABI break**:
+  my defensive `pip install pandas pyarrow scipy matplotlib` pulled numpy 2.x, incompatible with
+  the image's prebuilt torch/pyarrow ("_ARRAY_API not found"). Cancelled it.
+- Fix: defensive install now just `pyyaml matplotlib "numpy<2"` (image already has pandas/
+  pyarrow/numpy/torch compiled together); plotting falls back to local render of downloaded preds.
+- **Submitted 83-name training on Vertex:** job 2698031093080129536, run_id f4_vertex_20260612_111310,
+  n1-standard-16, epochs=20 seeds=3. data_uri repo_inputs/20260612_111310,
+  out_uri runs/f4_vertex_20260612_111310. ~83 names should give real cross-sectional breadth.

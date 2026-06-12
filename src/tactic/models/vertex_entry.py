@@ -32,10 +32,10 @@ def main(argv=None):
     ap.add_argument("--val_end", default="2022-12-31")
     a = ap.parse_args(argv)
 
-    # Vertex installs the package with --no-deps; defensively install the lightweight runtime
-    # deps the training+render path needs (torch/numpy already in the pytorch-xla image).
-    subprocess.call([sys.executable, "-m", "pip", "install", "-q",
-                     "pandas", "pyarrow", "pyyaml", "scipy", "matplotlib"])
+    # Vertex installs the package with --no-deps; the pytorch-xla image already has
+    # numpy/pandas/pyarrow/torch compiled together. Only add the missing pure deps and PIN
+    # numpy<2 so nothing drags in NumPy 2.0 (which breaks the prebuilt torch/pyarrow ABI).
+    subprocess.call([sys.executable, "-m", "pip", "install", "-q", "pyyaml", "matplotlib", "numpy<2"])
 
     # point the package at writable container paths BEFORE importing config
     work = Path("/tmp/tactic"); cfg_dir = work / "configs"; data_dir = work / "data"
