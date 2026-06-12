@@ -329,3 +329,17 @@ free to 1926 but are portfolio returns (market-state context), not tradeable sin
   non-stationarity). Repo's existing quarantine invariant already encodes this — honor it.
 - **Recommendation:** keep CPCV-on-2016-2026 as PRIMARY. Treat yfinance deep history as an OPTIONAL
   augmented-pretrain experiment, never touching OOS. Net: not worth blocking on; document + offer.
+
+### revision_plan.md → restructured into TWO SEPARATE RUNS (user req)
+- **RUN 1 (clean/deployable):** Alpaca SIP 2016-2026, 196 names, CPCV(8,2)=28 folds, bench = SPY +
+  equal-weight 196-universe. Panel data/curated/. Output results/run1_clean_<id>/.
+- **RUN 2 (deep/exploratory):** yfinance free daily 2000-2026, survivor pool (continuous-data filter),
+  CPCV(10,2)=45 folds, **bench = equal-weight buy-and-hold of its OWN pool** (NOT SPY). Separate panel
+  data/deep_panel/ (env override TACTIC_DATA_DIR; never touches curated; quarantine test holds).
+  Output results/run2_deep_<id>/.
+- **Key insight:** Run 2 benchmarked vs its own pool → survivorship bias CANCELS in the relative
+  comparison (both sides same survivor pool). Answers "beat owning its own pool across dot-com/GFC/
+  2011/2015-16/COVID/2022?" Valid despite absolute bias. Never headlined vs SPY, never deployable.
+- Plan: shared steps 0-2 (S1 baseline gate, ranking-aux f4, CPCV code), then Track A (A3-A7) then
+  Track B (B0-B6). Added §1B (two-run spec + pool def + EW-buy-hold benchmark math + isolation),
+  updated §3/§6/§8/§9, added data/deep_panel/ to .gitignore. yfinance already installed.

@@ -48,9 +48,11 @@ a ranking objective + a breadth/market-neutral portfolio.**
 - **No pre-2016 history in the OOS/clean panel.** Deep history (Stooq) in
   `data/diagnostic_quarantine/` is **forbidden** from joining curated features — enforced by
   `tests/test_quarantine_isolation.py` and PLAN §0.3. Do NOT wire deep history into the OOS panel.
-  Free deeper daily data *does* exist (yfinance, 1990+) but is **survivorship-biased**; it may be
-  used ONLY for an optional, clearly-labeled train-only pretraining ablation (see **§1A**), never for
-  scoring. A survivorship-safe deep source (CRSP/Sharadar) is paid and out of scope.
+  Free deeper daily data *does* exist (yfinance, 1990+) but is **survivorship-biased**; it is used
+  ONLY inside the **separate exploratory RUN 2**, which is benchmarked against equal-weight
+  buy-and-hold of its own pool (so the bias cancels in the comparison) and is never deployable and
+  never mixed into Run 1 (see **§1B**). A survivorship-safe deep source (CRSP/Sharadar) is paid and
+  out of scope.
 - **Usable span = 2016-01-04 → 2026-06-11** (already ingested for all 196 names; bars+auctions+
   labels+features+spreads present). User target end 2026-06-10 is already covered.
 - **PIT / fit-scope discipline.** Feature standardization and any target normalization are fit on
@@ -99,22 +101,86 @@ but only from 2016.
 - *Regime diversity (train/CV):* genuinely yes — 2016-2026 has only ~2 sustained bears (2020, 2022);
   pre-2016 adds the dot-com bust, **2008 GFC**, 2011 EU crisis, 2015-16 selloff. More stress regimes
   to learn from.
-- *Honest evaluation:* **no** — survivorship bias in the OOS would fake the score and defeat the
-  entire anti-overfitting purpose (PLAN §0.3). Bias in *evaluation* is fatal; bias in *pretraining*
-  is mild, and is further neutralized by the per-date **cross-sectional demeaning** in §4.3 (which
-  removes the survivor up-drift; the label is a 1-day cross-sectional relative return, not a
-  long-horizon absolute one, so survivorship sensitivity is low to begin with).
+- *Honest evaluation vs SPY:* **no** — survivorship bias against an external SPY benchmark would fake
+  the score and defeat the anti-overfitting purpose (PLAN §0.3). **This is why Run 2's benchmark is
+  its OWN pool, not SPY** (§1B): both sides share the identical survivor pool, so the bias cancels in
+  the difference. The residual survivor up-drift in training is further neutralized by the per-date
+  **cross-sectional demeaning** in §4.3 (the label is a 1-day cross-sectional *relative* return, not
+  a long-horizon absolute one, so survivorship sensitivity is low to begin with).
 
-**DECISION:**
-1. **Primary stays CPCV on the SIP-clean, delisting-aware 2016-2026 window.** Do not put free deep
-   history into the OOS. Keep `tests/test_quarantine_isolation.py` honored.
-2. **OPTIONAL experiment (clearly labeled, train-only):** an *augmented-pretrain* path that pretrains
-   f4 on yfinance 1990-2015 **surviving-name** daily bars (features+demeaned labels only), then
-   fine-tunes + validates + tests strictly on the clean 2016-2026 CPCV. Report as an ablation:
-   "does GFC/dot-com pretraining improve clean-window CPCV metrics?" If yes, modest robustness win;
-   if no, drop it. This NEVER touches OOS scoring and must be flagged as survivorship-biased input.
-3. **Not worth blocking on.** The clean-data CPCV redesign (§3) is the main lever. Pretraining is a
-   nice-to-have ablation, not a dependency.
+**DECISION — build TWO SEPARATE, INDEPENDENT RUNS (both are deliverables; see §1B for full specs):**
+1. **RUN 1 (clean / honest):** CPCV on the SIP-clean, delisting-aware **2016-2026** Alpaca window.
+   Benchmarks = SPY + equal-weight of the 196-name universe. This is the deployable-grade result.
+   Keep `tests/test_quarantine_isolation.py` honored — the clean curated panel never sees deep data.
+2. **RUN 2 (deep / exploratory):** a **completely separate** end-to-end run on free **yfinance deep
+   daily history (2000-2026)** for a fixed pool of long-lived survivor names. It has its OWN panel
+   (in a separate directory, NOT the clean curated one), its OWN train/val/test, and is benchmarked
+   against **equal-weight buy-and-hold of every stock in its own pool** (NOT SPY). The matched-pool
+   benchmark is the whole point: both the strategy and the benchmark draw from the identical
+   survivor pool, so **the survivorship bias cancels in the relative comparison** — Run 2's "did the
+   model beat simply owning its own pool" question is meaningful even though absolute returns are
+   inflated. Run 2 is exploratory (NOT deployable; bias acknowledged), reported separately, and must
+   never contaminate Run 1.
+
+---
+
+## 1B. THE TWO RUNS — read this carefully, they are independent deliverables
+
+You will produce **two separate runs**, each with its own data, its own model training, its own
+backtest, and its own report. **Do not mix them.** Run 1 is the honest/clean result; Run 2 is the
+deep-history exploratory result. Everything in §3–§6 (CPCV, ranking loss, S1 gate, firewall) applies
+to BOTH unless noted; only the data, the time span, and the benchmark differ.
+
+| | **RUN 1 — CLEAN (primary, deployable-grade)** | **RUN 2 — DEEP (exploratory, NOT deployable)** |
+|---|---|---|
+| Data source | Alpaca SIP (already ingested) | **yfinance** (free, no key) |
+| Time span | **2016-01-04 → 2026-06-10** | **2000-01-01 → 2026-06-10** (optionally 1990) |
+| Universe / pool | the 196 `LIQUID_BIG` names | survivor pool = §1B.1 below |
+| Delistings handled? | yes (Alpaca inactive assets + CA) | **NO — survivorship-biased** (acknowledged) |
+| Panel location | `data/curated/` (clean) | **`data/deep_panel/` (separate; never `curated/`)** |
+| Auctions / SIP spreads | yes | none → OHLC open→open labels + OHLC-derived spread surface |
+| Splitter | CPCV 8 groups, C(8,2)=28 folds | CPCV **10 groups, C(10,2)=45 folds** (longer span) |
+| **Benchmark** | **SPY + equal-weight 196-universe** | **equal-weight buy-and-hold of the entire Run-2 pool** (NOT SPY) |
+| Output dir | `results/run1_clean_<id>/` | `results/run2_deep_<id>/` |
+| Verdict use | deployable read | exploratory only; bias flagged in every artifact |
+
+**Why Run 2's benchmark is the pool itself, not SPY:** Run 2's pool contains only names that survived
+to today, so its absolute returns are inflated by survivorship. Comparing the strategy to **equal-
+weight buy-and-hold of the same pool** makes both sides carry the *identical* bias, so it cancels in
+the difference. The honest question Run 2 answers is therefore: *"Does the model's selection/timing
+beat naively owning an equal slice of its own pool, net of costs, across 2000-2026 regimes (dot-com
+bust, GFC, 2011, 2015-16, COVID, 2022)?"* That relative-alpha question is valid despite the bias.
+Run 2 must NOT be compared to SPY as a headline and must NOT be called deployable.
+
+### 1B.1 Run-2 pool definition (deterministic, no look-ahead beyond "exists today")
+- Candidate names = the 196 `LIQUID_BIG` list **plus** any other liquid large-caps you want, BUT the
+  pool is fixed by a single mechanical rule: **keep a name iff yfinance returns continuous daily data
+  from `POOL_START` (default 2000-01-01) through 2026-06-10 with < 2% missing sessions.** Drop ETFs
+  that postdate POOL_START if you want a pure-equity pool, or keep them — document the choice.
+- This yields a *survivor* pool (≈100-160 names depending on POOL_START). That is expected and is
+  exactly why the benchmark is the pool itself. Record the final pool list + each name's first date
+  to `results/run2_deep_<id>/pool.csv`.
+- **QA(pool):** assert every pool name has ≥ 0.98 × (#NYSE sessions in span) rows; assert no name
+  starts after POOL_START + 5 sessions; print pool size.
+
+### 1B.2 Run-2 equal-weight buy-and-hold benchmark (exact definition)
+- Use yfinance **Adj Close** (total return incl. dividends/splits). At `POOL_START`, assign weight
+  `1/M` to each of the M pool names; **buy and hold with no rebalance** (weights drift) → this is the
+  honest "own the pool" line. NAV_t = mean over names of (AdjClose_t / AdjClose_start). Names that
+  (despite the filter) have a gap are forward-filled within the gap only.
+- **Secondary benchmark:** equal-weight **monthly-rebalanced** (reset to 1/M each month-end) — report
+  both; the strategy net must beat at least the buy-and-hold line to be interesting.
+- The strategy in Run 2 trades the same pool, long-flat AND dollar-neutral L/S variants (§5), net of
+  the OHLC-derived spread costs.
+
+### 1B.3 Run-2 isolation (do not break Run 1 or the quarantine test)
+- Build Run-2's panel into a **separate directory** using the config env overrides (already
+  supported): set `TACTIC_DATA_DIR=<repo>/data/deep_panel` before building features/labels/spreads so
+  nothing is written to `data/curated/`. The yfinance raw pulls live under
+  `data/diagnostic_quarantine/yfinance/`.
+- `tests/test_quarantine_isolation.py` must still pass — Run 2 uses its own panel dir and never joins
+  quarantined data into `data/curated/`. Add a test asserting `data/deep_panel/` is the only sink for
+  deep data.
 
 ---
 
@@ -149,9 +215,13 @@ exactly why combinatorial (not chronological) CV is required.
 
 ## 3. Target design — primary and fallback
 
+> The CPCV machinery below is written for **Run 1** (2016-2026, `N_GROUPS=8`). **Run 2** reuses the
+> *identical* code with `N_GROUPS=10, K_TEST=2` over 2000-2026 and `--panel_dir=data/deep_panel/curated`
+> (see §1B / Track B). Implement once, parametrize the span and group count.
+
 ### 3A. PRIMARY: Combinatorial Purged Cross-Validation (CPCV) — de Prado §15.1 / PLAN Phase 13
-- **Blocks:** split the ordered trading-day axis (2016-01-04 → 2026-06-11, ~2625 sessions) into
-  `N_GROUPS = 8` contiguous, roughly equal groups (~328 sessions ≈ 1.3 yr each). Record each group's
+- **Blocks:** split the ordered trading-day axis (Run 1: 2016-01-04 → 2026-06-11, ~2625 sessions) into
+  `N_GROUPS` contiguous, roughly equal groups (Run 1: 8 groups ≈ 1.3 yr each). Record each group's
   calendar span and tag it with the §2 regime(s) it covers.
 - **Folds:** every combination of `K_TEST = 2` groups held out as OOS → `C(8,2) = 28` folds. In each
   fold the other 6 groups are training. Config already declares `validation.cpcv_groups: 8`,
@@ -259,7 +329,8 @@ All of these are currently **stubs** — implement what you use:
   path matrix (de Prado). Gate G8 threshold `pbo_max: 0.20`.
 - `validation/dsr.py` — DONE. Compute **Deflated Sharpe** on the combined OOS net returns with honest
   N = number of model/HPO trials from the registry. Gate `dsr_min: 0.95`.
-- `validation/dm_test.py` — DONE. Diebold-Mariano vs SPY and vs equal-weight universe.
+- `validation/dm_test.py` — DONE. Diebold-Mariano: **Run 1** vs SPY and vs equal-weight 196-universe;
+  **Run 2** vs the equal-weight-buy-and-hold-of-pool benchmark (NOT SPY).
 - `validation/spa.py`, `romano_wolf.py`, `firewall.py`, `attribution.py` — STUBS; implement SPA /
   Romano-Wolf stepdown if you want G3/G9 verdicts, else explicitly mark "not run".
 - **Report every gate's number (G1,G2,G3,G8,G9, S1) but do NOT halt on them** unless the owner
@@ -293,72 +364,113 @@ All of these are currently **stubs** — implement what you use:
   still fails, iterate on `λ_rank`/capacity (val-selected) before spending Vertex on CPCV. **Never
   consult OOS to make these choices.**
 
-**STEP 2.5 — OPTIONAL augmented-pretrain ablation (§1A, train-only, skippable).**
-- Only if pursuing the deep-history experiment. Build a SEPARATE quarantined panel from yfinance
-  1990-2015 for the survivors of the 196-name list (`yf.download(sym, start='1990-01-01',
-  end='2016-01-01', auto_adjust=False)`); compute the same features + **cross-sectionally demeaned**
-  labels; keep it in `data/diagnostic_quarantine/` (do NOT join to curated). Pretrain f4 on it, then
-  load weights as init for the §3 CPCV training on clean 2016-2026.
-- **QA2.5:** assert the pretrain panel never enters any OOS/test set; assert the quarantine-isolation
-  test still passes; report it as an ablation row ("pretrain on/off") on clean CPCV metrics only.
-- If it does not improve clean-window metrics, DROP it. Never block the main path on this.
+Shared steps 0-2 above are done ONCE and serve both runs (the splitter/driver/portfolio/firewall
+code is reused; only data span + benchmark differ). Then execute **TRACK A (Run 1)** fully, then
+**TRACK B (Run 2)**. Do not interleave their data directories.
 
-**STEP 3 — implement CPCV splitter + driver (§3A).**
-- Implement `cpcv_paths` (returns the 28 train/test group partitions with purge+embargo masks).
-- Add a CPCV training driver `src/tactic/models/train_cpcv.py` that, per fold: builds the panel,
-  applies fold masks, fits channel-stats on fold-train only, carves the nested embargoed val slice,
-  trains f4 (seeds=3, ranking-augmented), predicts the held-out test groups; then aggregates the
-  combined-OOS predictions and saves per-fold net-return paths.
-- **QA3:** unit-test that (a) no test row appears in any same-fold train set, (b) purge+embargo gaps
-  hold (no train label window within 2d of a test group; ≥5d embargo after), (c) every session is OOS
-  in exactly `C(7,1)=7` folds, (d) combined-OOS covers 2016→2026 incl all of 2022.
+### TRACK A — RUN 1 (clean, 2016-2026, Alpaca)
 
-**STEP 4 — run on Vertex.**
-- Extend `vertex_entry.py` / `train_on_vertex.py` to accept `--cv=cpcv` (and pass through
-  `n_groups`, `k_test`, `patience`, ranking weight). 28 folds × 3 seeds is heavy → either one job
-  looping folds on `n1-standard-16`, or fan out folds as separate jobs. Estimate runtime from a
-  1-fold timing, set polling cadence, **stay online until SUCCEEDED**.
-- **QA4:** confirm artifacts: combined `oos_predictions.parquet`, per-fold `paths.csv`
-  (28 net Sharpes), `loss_history.csv` per fold/seed, `config.json` with the exact CV spec.
+**A3 — CPCV splitter + driver (§3A).**
+- Implement `cpcv_paths(returns_index, n_groups=8, k_test=2, purge=2, embargo=5)` → the 28
+  train/test group partitions with purge+embargo masks.
+- Add CPCV driver `src/tactic/models/train_cpcv.py`: per fold build panel from `data/curated/`, apply
+  fold masks, fit channel-stats on fold-train only, carve the nested embargoed val slice, train f4
+  (seeds=3, ranking-augmented), predict held-out test groups; aggregate combined-OOS predictions;
+  save per-fold net-return paths.
+- **QA-A3:** unit-test (a) no test row in same-fold train, (b) purge+embargo gaps hold, (c) every
+  session is OOS in exactly `C(7,1)=7` folds, (d) combined-OOS covers 2016→2026 incl all 2022.
 
-**STEP 5 — portfolio + metrics (§5).**
-- Backtest the combined-OOS predictions with BOTH books (dollar-neutral L/S; long-flat breadth) vs
-  BOTH benchmarks (SPY; equal-weight universe). Produce overall + **per-calendar-year** +
-  **per-regime** (using §2 map) metrics: total, CAGR, vol, Sharpe, Sortino, maxDD, turnover, IC,
-  hit-rate, coverage, pinball.
-- **QA5:** NAV identity holds; costs > 0; coverage near nominal; IC computed per date then averaged.
+**A4 — run on Vertex.**
+- Extend `vertex_entry.py`/`train_on_vertex.py` with `--cv=cpcv --panel_dir=...` (+ `n_groups`,
+  `k_test`, `patience`, `lambda_rank`). 28 folds × 3 seeds is heavy → one job looping folds on
+  `n1-standard-16` or fan out. Estimate from a 1-fold timing; **stay online until SUCCEEDED**.
+- **QA-A4:** artifacts present: combined `oos_predictions.parquet`, `paths.csv` (28 net Sharpes),
+  `loss_history.csv` per fold/seed, `config.json` with exact CV spec. Output → `results/run1_clean_<id>/`.
 
-**STEP 6 — firewall (§6).**
-- DSR on combined-OOS net returns (honest-N from registry). PBO over the 28 paths. DM vs each
-  benchmark. CPCV path-Sharpe distribution. Report all; do not halt.
-- **QA6:** N used in DSR equals registry trial count; PBO in [0,1]; path count = 28.
+**A5 — portfolio + metrics (§5).** Backtest combined-OOS with BOTH books (dollar-neutral L/S;
+long-flat breadth) vs **SPY + equal-weight 196-universe**. Overall + per-year + per-regime (§2)
+metrics. **QA-A5:** NAV identity; costs>0; coverage near nominal; IC per-date then averaged.
 
-**STEP 7 — report + graphs + commit.**
-- Write `results/<run_id>/RESULTS_REVISION.md`: split design, regime map, equity vs both benchmarks,
-  drawdown, per-year + per-regime tables, train/val loss curves (show no collapse: S1 margin), CPCV
-  path-Sharpe histogram, PBO/DSR/DM, honest verdict. Graphs as PNG.
-- Append everything to `notes.md` (append-only; never delete).
-- **Security:** before any commit verify `.env` stays gitignored and NO `.env`/`data/curated`/raw
-  `*.parquet` are staged (only `results/**` artifacts + code). Commit + push to
-  `https://github.com/JulianAttemptsCoding/cutie-QT-`.
+**A6 — firewall (§6).** DSR (honest-N from registry), PBO over the 28 paths, DM vs each benchmark,
+path-Sharpe distribution. Report, do not halt. **QA-A6:** N=registry count; PBO∈[0,1]; 28 paths.
+
+**A7 — report.** Write `results/run1_clean_<id>/RESULTS_RUN1.md` + graphs (equity vs SPY & EW-univ,
+drawdown, per-year/per-regime tables, loss curves showing S1 margin, path-Sharpe histogram,
+PBO/DSR/DM). Honest verdict.
+
+### TRACK B — RUN 2 (deep, 2000-2026, yfinance, benchmark = own pool)
+
+**B0 — deep data ingest (NEW `src/tactic/ingest/yfinance_deep.py`).**
+- Set `TACTIC_DATA_DIR=<repo>/data/deep_panel` for ALL of Track B so nothing writes to `curated/`.
+- Derive the pool per §1B.1 (continuous yfinance daily data POOL_START=2000-01-01→2026-06-10, <2%
+  missing). Pull `yf.download(sym, start='2000-01-01', end='2026-06-11', auto_adjust=False)` for each;
+  store raw under `data/diagnostic_quarantine/yfinance/`. Map to the repo's bar schema
+  (symbol,date,o,h,l,c,v,vw≈c,adjustment): build an `all`-adjusted set from Adj Close ratio and a
+  `raw` set; write `data/deep_panel/curated/prices_daily.parquet`. No auctions.
+- Build spreads (OHLC-derived CS/AR/EDGE — works without SIP), labels (open→open, no auction), and
+  features into `data/deep_panel/curated/`. Save pool list → `results/run2_deep_<id>/pool.csv`.
+- **QA-B0:** pool filter asserts (§1B.1); 0 inf in features; date span 2000→2026-06-10; quarantine
+  test still passes; `data/curated/` untouched (diff its mtime/hash before & after).
+
+**B1 — sanity + model.** Reuse the S1 gate + ranking-augmented f4 unchanged (they are data-agnostic).
+Quick chronological smoke (train 2000-2015 / val 2016-2017) to confirm S1 PASS on this pool before
+spending Vertex. **QA-B1:** S1 margin ≥1%; q50 dispersion healthy.
+
+**B2 — CPCV on the deep span.** Same `cpcv_paths` but `n_groups=10, k_test=2` → C(10,2)=45 folds over
+2000-2026 (~2.6yr/group). Driver points `--panel_dir=data/deep_panel/curated`. Combined-OOS spans
+2000→2026 incl dot-com bust, GFC, 2011, 2015-16, COVID, 2022.
+- **QA-B2:** coverage = each session OOS in `C(9,1)=9` folds; purge/embargo hold; 2008 GFC present in OOS.
+
+**B3 — run on Vertex.** Same job, `--panel_dir=data/deep_panel/curated`, output → `results/run2_deep_<id>/`.
+Stay online until SUCCEEDED. **QA-B3:** artifacts present (as A4).
+
+**B4 — portfolio + the pool benchmark (§1B.2).** Backtest combined-OOS with dollar-neutral L/S AND
+long-flat books, net of OHLC-derived costs, on the deep pool. Implement the **equal-weight
+buy-and-hold of the entire Run-2 pool** benchmark (Adj Close, no rebalance) + secondary monthly-
+rebalanced EW. Strategy net must be compared to THESE, not SPY. Overall + per-year + per-regime.
+- **QA-B4:** benchmark NAV uses Adj Close total return; pool size M logged; strategy & benchmark share
+  the identical pool (survivorship cancels in the spread); NAV identity holds.
+
+**B5 — firewall.** DSR (honest-N), PBO over 45 paths, **DM vs the equal-weight-pool benchmark**,
+path-Sharpe distribution. **QA-B5:** 45 paths; PBO∈[0,1]; N=registry count.
+
+**B6 — report.** Write `results/run2_deep_<id>/RESULTS_RUN2.md`: pool definition + `pool.csv`,
+prominent **survivorship-bias caveat** at the top, equity vs **equal-weight-pool** (and monthly-EW),
+drawdown, per-year/per-regime tables incl GFC, loss curves, path-Sharpe histogram, PBO/DSR/DM-vs-pool,
+honest verdict ("beat / did not beat owning its own pool"). NEVER headline vs SPY; NEVER call
+deployable.
+
+**STEP FINAL — append `notes.md` (append-only) for both runs; commit + push.**
+- **Security:** before any commit verify `.env` stays gitignored and NO `.env` / `data/curated` /
+  `data/deep_panel` / `data/diagnostic_quarantine` / raw `*.parquet` are staged (only `results/**`
+  artifacts + code). Commit + push to `https://github.com/JulianAttemptsCoding/cutie-QT-`.
 
 ---
 
-## 8. Acceptance criteria (definition of done)
+## 8. Acceptance criteria (definition of done) — BOTH runs required
 
-1. Data verified to 2026-06-10+, 196 names, 0 inf, panel rebuilt. (QA0)
-2. S1 sanity gate implemented and **model PASSES S1 on val** (beats unconditional baseline ≥1%);
-   per-date q50 dispersion materially > prior 0.018. (QA2) — proves the collapse is fixed *without*
-   OOS.
-3. CPCV implemented and **unit-tested** for leakage/purge/embargo/coverage; 2022 confirmed OOS. (QA3)
-4. Vertex run completes; combined-OOS spans 2016→2026 incl 2022; 28 fold paths saved. (QA4)
-5. Dollar-neutral L/S + long-flat books backtested vs SPY AND equal-weight universe, with per-year
-   and per-regime breakdowns. (QA5)
-6. DSR + PBO + DM computed and reported (noted, not enforced). (QA6)
-7. `revision_plan.md` followed; `RESULTS_REVISION.md` + graphs written; `notes.md` appended; pushed;
-   `.env` never committed.
-8. **Honest verdict** stated either way. A clean negative (no market-neutral alpha across regimes)
-   is a successful, publishable result per PLAN §0.3.10 — do not manufacture a win.
+**Shared:**
+1. S1 sanity gate implemented; **model PASSES S1 on val** (beats unconditional baseline ≥1%) and
+   per-date q50 dispersion materially > prior 0.018. (QA2) — proves the collapse is fixed *without* OOS.
+2. `cpcv_paths` implemented and **unit-tested** for leakage/purge/embargo/coverage.
+3. DSR + PBO + DM computed and reported for each run (noted, not enforced).
+4. `.env` never committed; no raw/curated/deep `*.parquet` staged; only `results/**` + code pushed.
+5. **Honest verdict per run, stated either way.** A clean negative is a successful result
+   (PLAN §0.3.10) — do not manufacture a win.
+
+**RUN 1 (clean):**
+6. Data verified to 2026-06-10+, 196 names, 0 inf. CPCV(8,2)=28 folds; 2022 confirmed OOS.
+7. Backtested (L/S + long-flat) vs **SPY AND equal-weight 196-universe**, per-year + per-regime.
+8. `results/run1_clean_<id>/RESULTS_RUN1.md` + graphs written.
+
+**RUN 2 (deep, separate):**
+9. `data/deep_panel/` built from yfinance 2000-2026; `data/curated/` provably untouched; quarantine
+   test passes; `pool.csv` saved with the survivor pool + first dates.
+10. CPCV(10,2)=45 folds; combined-OOS spans 2000→2026 incl 2008 GFC.
+11. Backtested vs **equal-weight buy-and-hold of its OWN pool** (+ monthly-EW secondary); per-year +
+    per-regime incl GFC. DM is vs the pool benchmark, not SPY.
+12. `results/run2_deep_<id>/RESULTS_RUN2.md` with a top-of-file **survivorship-bias caveat**, never
+    headlined vs SPY, never labeled deployable.
 
 ---
 
@@ -372,13 +484,14 @@ All of these are currently **stubs** — implement what you use:
 | `src/tactic/validation/walk_forward.py` | IMPLEMENT `make_folds` (stub; for §3B fallback) |
 | `src/tactic/validation/pbo.py` | IMPLEMENT PBO (stub today) |
 | `src/tactic/models/train_cpcv.py` | NEW — CPCV driver + combined-OOS aggregation |
-| `src/tactic/ingest/yfinance_deep.py` | NEW (OPTIONAL, §2.5) — yfinance 1990-2015 survivors → `data/diagnostic_quarantine/` only; pretrain panel. Never joins curated. |
-| `src/tactic/backtest/run.py` | EDIT — add dollar-neutral L/S book + equal-weight-universe benchmark + per-regime grouping |
-| `vertex/vertex_entry.py`, `vertex/train_on_vertex.py` | EDIT — `--cv=cpcv` passthrough, fold fan-out/loop |
+| `src/tactic/ingest/yfinance_deep.py` | NEW (RUN 2, §1B/B0) — yfinance 2000-2026 survivor pool → `data/deep_panel/` (separate). Pool filter + schema map. Never joins `curated/`. Needs `yfinance` (already installed). |
+| `src/tactic/backtest/run.py` | EDIT — add equal-weight-buy-and-hold-of-pool benchmark (Run 2) + EW-universe benchmark (Run 1) + dollar-neutral L/S book + per-regime grouping |
+| `.gitignore` | VERIFY `data/deep_panel/` + `data/diagnostic_quarantine/` ignored (deep raw data must not be committed) |
+| `results/run1_clean_<id>/RESULTS_RUN1.md`, `results/run2_deep_<id>/RESULTS_RUN2.md` | NEW — one report per run |
+| `vertex/vertex_entry.py`, `vertex/train_on_vertex.py` | EDIT — `--cv=cpcv --panel_dir=...` passthrough, fold fan-out/loop |
 | `configs/v1.yaml` | (already has cpcv_groups/cpcv_test/purge/embargo) — add `lambda_rank` if desired |
-| `tests/` | NEW — CPCV leakage/coverage tests; S1 constant-predictor test |
-| `results/<run_id>/RESULTS_REVISION.md` | NEW — final report |
-| `notes.md` | APPEND — running log |
+| `tests/` | NEW — CPCV leakage/coverage tests; S1 constant-predictor test; deep-panel isolation test |
+| `notes.md` | APPEND — running log (both runs) |
 
 ## 10. Pitfalls / gotchas (learned, save the next agent time)
 - Vertex image is **Python 3.10**, installs pkg `--no-deps`; entry must `pip install pyyaml

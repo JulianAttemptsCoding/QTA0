@@ -10,6 +10,7 @@ data/features/
 data/labels/
 data/holdout/
 data/diagnostic_quarantine/
+data/deep_panel/
 !data/**/.gitkeep
 
 # registry artifacts (ledger is generated; keep dir, ignore parquet)
