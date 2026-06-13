@@ -31,6 +31,19 @@ def main(argv=None):
     ap.add_argument("--train_end", default="2020-12-31")
     ap.add_argument("--val_end", default="2021-12-31")
     ap.add_argument("--patience", type=int, default=5)
+    # CPCV (revision_plan §3A) passthrough
+    ap.add_argument("--cv", default="walk", choices=["walk", "cpcv"])
+    ap.add_argument("--n_groups", type=int, default=8)
+    ap.add_argument("--k_test", type=int, default=2)
+    ap.add_argument("--purge", type=int, default=2)
+    ap.add_argument("--embargo", type=int, default=5)
+    ap.add_argument("--fold_start", type=int, default=0)
+    ap.add_argument("--fold_end", type=int, default=-1)
+    ap.add_argument("--lambda_rank", type=float, default=0.3)
+    ap.add_argument("--demean", type=int, default=1)
+    ap.add_argument("--k_book", type=int, default=35)
+    ap.add_argument("--lr", type=float, default=1e-3)
+    ap.add_argument("--weight_decay", type=float, default=1e-4)
     a = ap.parse_args(argv)
 
     # Vertex installs the package with --no-deps; the pytorch-xla image already has
@@ -59,9 +72,23 @@ def main(argv=None):
                 continue  # optional
             raise
 
+    if a.cv == "cpcv":
+        from .train_cpcv import run_cpcv
+        fold_end = None if a.fold_end < 0 else a.fold_end
+        r = run_cpcv(model_kind=a.model, n_groups=a.n_groups, k_test=a.k_test,
+                     purge=a.purge, embargo=a.embargo, epochs=a.epochs, seeds=a.seeds,
+                     patience=a.patience, lambda_rank=a.lambda_rank, demean=bool(a.demean),
+                     fold_start=a.fold_start, fold_end=fold_end, k_book=a.k_book,
+                     run_id="vertex_run")
+        # upload fold artifacts directly (flatten into out_uri so shards co-locate)
+        _gsutil("cp", "-r", str(r["run_dir"]), a.out_uri.rstrip("/") + "/")
+        print(f"[vertex_entry] cpcv folds {a.fold_start}..{fold_end} done -> {a.out_uri}")
+        return
+
     r = train(model_kind=a.model, epochs=a.epochs, seeds=a.seeds,
               train_end=a.train_end, val_end=a.val_end, run_id="vertex_run",
-              patience=a.patience)
+              patience=a.patience, lambda_rank=a.lambda_rank, demean=bool(a.demean),
+              lr=a.lr, weight_decay=a.weight_decay)
     try:
         from ..reports.results import render_run
         render_run(r["run_id"])

@@ -51,3 +51,9 @@ Thumbs.db
 # vertex local
 vertex/dist/
 *.tar.gz
+
+# scratch logs
+*.log
+# bulky CPCV intermediates (keep reports, drop raw fold/combined parquet)
+results/**/fold_*_oos.parquet
+results/**/oos_predictions.parquet

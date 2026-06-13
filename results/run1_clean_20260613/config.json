@@ -1,0 +1,19 @@
+{
+  "model": "f4",
+  "n_groups": 8,
+  "k_test": 2,
+  "purge": 2,
+  "embargo": 5,
+  "epochs": 12,
+  "seeds": 2,
+  "patience": 5,
+  "lambda_rank": 0.5,
+  "demean": true,
+  "val_frac": 0.15,
+  "n_folds": 28,
+  "fold_start": 24,
+  "fold_end": 28,
+  "n_dates": 2482,
+  "coverage_min": 7,
+  "coverage_max": 7
+}

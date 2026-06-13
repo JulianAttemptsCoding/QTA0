@@ -1,0 +1,22 @@
+{
+  "fold_id": 15,
+  "test_groups": [
+    2,
+    5
+  ],
+  "n_train": 1565,
+  "n_val": 276,
+  "n_test": 622,
+  "val_pinball": 1.466199642236783,
+  "s1": {
+    "pass": false,
+    "margin": 0.009908481756283867,
+    "min_rel": 0.01,
+    "model_pinball": 1.466199642236783,
+    "baseline_pinball": 1.4808728437928809
+  },
+  "q50_dispersion": 0.023656252771615982,
+  "path_sharpe": -1.7872911274687417,
+  "path_n_days": 622,
+  "path_mean_ret": -0.0006819471810485904
+}
