@@ -1,0 +1,22 @@
+{
+  "model": "f4",
+  "epochs": 30,
+  "seeds": 2,
+  "train_end": "2015-12-31",
+  "val_end": "2017-12-31",
+  "lambda_rank": 0.5,
+  "demean": true,
+  "n_train": 3884,
+  "n_val": 496,
+  "n_test": 2112,
+  "best_val_pinball": 1.426795579553131,
+  "baseline_val_pinball": 1.4338197888519526,
+  "s1": {
+    "pass": false,
+    "margin": 0.004898948496481382,
+    "min_rel": 0.01,
+    "model_pinball": 1.426795579553131,
+    "baseline_pinball": 1.4338197888519526
+  },
+  "q50_dispersion": 0.022515472024679184
+}

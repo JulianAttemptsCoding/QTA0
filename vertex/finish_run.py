@@ -30,6 +30,8 @@ def main():
     ap.add_argument("--pool_csv", default=None)
     ap.add_argument("--out", default=None, help="local results dir (default results/<run_id>)")
     ap.add_argument("--k_book", type=int, default=35)
+    ap.add_argument("--single", action="store_true",
+                    help="walk-forward / single-OOS run (oos_predictions.parquet already present; skip CPCV aggregation)")
     a = ap.parse_args()
     load_dotenv()
     v = VertexConfig.from_config(load_config())
@@ -46,9 +48,13 @@ def main():
 
     from tactic.models.train_cpcv import aggregate_combined
     from tactic.reports.oos_report import build_report
-    print("[2/3] aggregate combined OOS")
-    agg = aggregate_combined(out)
-    print("   ", agg)
+    if a.single:
+        print("[2/3] single-OOS run — using oos_predictions.parquet as-is (no CPCV aggregation)")
+        assert (out / "oos_predictions.parquet").exists(), "missing oos_predictions.parquet"
+    else:
+        print("[2/3] aggregate combined OOS")
+        agg = aggregate_combined(out)
+        print("   ", agg)
 
     print("[3/3] build report")
     prices_path = ROOT / a.panel_dir / "prices_daily.parquet"

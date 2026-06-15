@@ -57,3 +57,7 @@ vertex/dist/
 # bulky CPCV intermediates (keep reports, drop raw fold/combined parquet)
 results/**/fold_*_oos.parquet
 results/**/oos_predictions.parquet
+
+# scratch dirs (extracted parquet for analysis)
+r0check/
+r2check/

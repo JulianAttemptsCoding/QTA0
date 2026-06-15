@@ -343,3 +343,82 @@ free to 1926 but are portfolio returns (market-state context), not tradeable sin
 - Plan: shared steps 0-2 (S1 baseline gate, ranking-aux f4, CPCV code), then Track A (A3-A7) then
   Track B (B0-B6). Added §1B (two-run spec + pool def + EW-buy-hold benchmark math + isolation),
   updated §3/§6/§8/§9, added data/deep_panel/ to .gitignore. yfinance already installed.
+
+---
+
+## 2026-06-15 — run0 vs run2.1 deep-dive: why deep run is coin-flip (all ideas compiled)
+
+### Naming
+- **run0** = SPY-beater, `results/f4_vertex_3yr/` (commit 18e1896 / branch run0). f4, 83 Alpaca-SIP
+  names, trained 2016-2021 / val 2022 / **OOS 2023-2026** (782 days). Trading = long-only/long-flat
+  top-5 buy/hold band, next-open fills.
+- **run1** = clean CPCV (Alpaca SIP 196 names, 28 folds). `results/run1_clean_20260613/`.
+- **run2** = deep CPCV (yfinance 153 survivors, 45 folds). `results/run2_deep_20260613/` (partial).
+- **run2.1** = deep CHRONOLOGICAL walk-forward (153 survivors, trained 2000-15 / val 16-17 /
+  **OOS 2018-2026**). `results/run2_1_chrono/`.
+
+### Headline numbers
+| | run0 (2023-26) | run2.1 L/S (2018-26) | run2.1 long-flat |
+|---|---|---|---|
+| CAGR | +23.6% | -16.6% | +8.1% |
+| vs bench | SPY +21.0% (beats on CAGR) | EWpool +19.0% (loses) | EWpool +19.0% (loses) |
+| Sharpe | 1.10 (< SPY 1.29!) | -1.97 | 0.57 |
+| beta | 0.94 | 0.02 | 0.03 |
+| alpha/yr | +4.3% | -18.1% | +8.6% (artifact of low beta) |
+| maxDD | -26% (> SPY -20%) | -78.8% | -35.6% |
+| hit rate | 52.5% | 49.7% | — |
+
+### KEY FACT: run0 "beat SPY" is CAGR-only + modest
+- 3-yr CAGR 23.6 vs 21.0 = **+2.6%/yr**, but **Sharpe 1.10 < SPY 1.29** and **maxDD worse** (-26 vs
+  -20). It is ~fully-long (beta 0.94) with a small +4.3% alpha. Not a risk-adjusted win.
+- The much-quoted 2023-ONLY 41.9% was beta 1.25 × a +24% bull = ~30% beta + ~9% residual. Single
+  year, levered into a rally.
+
+### Experiment: old (run0) trader on run2.1's existing deep predictions (no retrain)
+- `scripts/rerun_run21_oldtrader.py` → `results/run2_1_chrono/metrics_oldtrader.json`.
+- Top-5 long-only band on run2.1 preds, 2018-2026: **CAGR +0.10%**, Sharpe 0.10, maxDD -48%,
+  alpha vs SPY -7.4%/yr, vs EWpool -10.2%/yr. ~Dead flat over 8 years.
+- **Conclusion: the trading algo was NOT the secret sauce.** A good low-cost trader cannot rescue a
+  no-edge predictor (Fundamental Law: IR = IC·√breadth; IC≈0 ⇒ IR≈0).
+- It still beats run2.1's brutal dollar-neutral daily L/S (+0.1% vs -16.6%) because long-bias + low
+  cost help; but loses to just owning the pool. Even underperforms run2.1's own long-flat (+8.1%)
+  because concentrating into 5 names WITHOUT skill = pure idiosyncratic noise (low transfer coeff).
+
+### Prediction accuracy over time (graph: results/run2_1_chrono/accuracy_run0_vs_run21.png)
+- Per-year directional hit (run0 | run2.1), identical 2023-2026 window:
+  2023: 52.2 | 49.2 · 2024: 53.1 | 49.6 · 2025: 52.4 | 49.1 · 2026: 52.2 | 49.4
+- Full-window: run0 52.5% (**day-clustered t=+3.49 → significant >50%**); run2.1 2018-26 49.7%
+  (t=-1.56, coin-flip); run2.1 on the 2023-26 OVERLAP 49.4% (t=-2.03, slightly BELOW coin-flip).
+- **Same window, same stocks ⇒ the entire gap is the PREDICTOR, not the regime.** run0 has genuine
+  (if small) cross-sectional skill every year; run2.1 has none.
+- NOTE/correction: 2023-ONLY run0 hit was borderline (t=+1.63, not sig); the FULL 2023-2026 run0 IS
+  significant once 782 days accumulate.
+
+### WHY run2.1 ≈ coin-flip, run0 has skill (ranked hypotheses + how to test)
+1. **Stale training window / concept drift (HIGHEST).** run0 trained 2016-21 → tested adjacent
+   2023-26. run2.1 trained 2000-15 → tested 2018-26 (3-11yr forward). Feature→winner map drifts
+   across market-structure eras. TEST: retrain deep model rolling-recent (2014-17 → test 2018).
+2. **Degraded free-data features (HIGH).** yfinance has no trade-count ⇒ ch05 forced = ch04 (dead
+   duplicate). run0 on Alpaca SIP had real trade intensity. TEST: ablate ch05 on run0 SIP data.
+3. **Universe quality not size (MEDIUM).** 153 yfinance survivors vs 83 curated SIP. Breadth helps
+   only if IC>0. TEST: run deep model on the same 83 SIP names.
+4. **Survivorship pool ⇒ degenerate cross-section (MEDIUM).** The 153 all survived to 2026; their
+   2000-15 cross-section is dominated by eventual mega-winners ⇒ model may learn "everything rises"
+   (no relative signal). TEST: check q50 cross-sectional dispersion / ranking degeneracy.
+5. **Target/label mismatch (LOW-MED).** run2.1 demeans cross-sectionally; if run0 didn't identically,
+   sign-hit means subtly different things. TEST: recompute on identical target def.
+
+### Supporting literature
+- Grinold & Kahn — Fundamental Law of Active Management: IR = IC·√breadth.
+- Clarke, de Silva & Thorley — "FLoAM: Redux": realized IR = TC·IC·√breadth (transfer coefficient;
+  a concentrated long-only top-5 band has LOW TC ⇒ can't express a cross-sectional signal).
+- Bailey & López de Prado — Deflated Sharpe Ratio (SSRN 2460551): best-of-N selection inflates
+  Sharpe even on noise; overfit strategies underperform OOS. run0 widened 15→83 names "until it
+  worked" = best-of-N; DSR never computed on run0. The CPCV re-validations are the deflated test.
+- Bailey, Borwein, López de Prado, Zhu — Probability of Backtest Overfitting (SSRN 2326253).
+
+### Verdict
+run0 had genuine, statistically-significant (t=3.49) cross-sectional skill — but it only converted to
+a MODEST CAGR beat (and a worse Sharpe), mostly via near-full-long market exposure. run2.1's deep
+predictor is honest coin-flip (slightly below on the overlap). Trading algo is a second-order lever;
+the first-order driver is predictor skill, which is killed by stale-window + degraded-free-data.
