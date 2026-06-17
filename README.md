@@ -26,12 +26,15 @@ fingerprint of concept drift. **Conclusion: not deployable.**
 
 ## The four runs
 
-| run | data | universe | validation | test hit | verdict |
-|---|---|---|---|---|---|
-| run0 | Alpaca SIP | 83 | chronological, adjacent | 52.5% (t=+3.49) | CAGR-beat only |
-| run1 | Alpaca SIP | 196 | CPCV(8,2) 28 folds | 51.1% (t=+5.36) | NEGATIVE |
-| run2 | yfinance | 153 | CPCV(10,2) 45 folds | 50.5% (t=+5.91) | NEGATIVE |
-| run2.1 | yfinance | 153 | chronological, distant | 49.7% (t=−1.56) | NEGATIVE (coin-flip) |
+| run | git branch | results dir | data | universe | validation | test hit | verdict |
+|---|---|---|---|---|---|---|---|
+| **run0** | `run0` | (branch only, @18e1896) | Alpaca SIP | 83 | chronological, adjacent | 52.5% (t=+3.49) | CAGR-beat only |
+| **run1** | `run1` | `results/run1_clean_20260613/` | Alpaca SIP | 196 | CPCV(8,2) 28 folds | 51.1% (t=+5.36) | NEGATIVE |
+| **run2** | `run2` | `results/run2_deep_20260613/` | yfinance | 153 | CPCV(10,2) 45 folds | 50.5% (t=+5.91) | NEGATIVE |
+| **run2.1** | `run2.1` | `results/run2_1_chrono/` | yfinance | 153 | chronological, distant | 49.7% (t=−1.56) | NEGATIVE (coin-flip) |
+
+`main` is the canonical branch (this README + full REPORT.md + run1/run2/run2.1 artifacts). Each run also
+has its own labeled branch as an archival snapshot; run0's raw artifacts live on the `run0` branch.
 
 > runs 2 / 2.1 use survivorship-biased free data → benchmarked only against their own pool, never SPY,
 > never deployable. See REPORT.md §1.
