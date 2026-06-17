@@ -64,6 +64,7 @@ def main():
     ap.add_argument("--k_book", type=int, default=35)
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--weight_decay", type=float, default=1e-4)
+    ap.add_argument("--seed_base", type=int, default=1338)
     ap.add_argument("--panel_dir", default=None,
                     help="local panel dir to upload (default data/curated; use data/deep_panel/curated for Run 2)")
     ap.add_argument("--run_id", default=None, help="shared run id (shards co-locate under runs/<run_id>)")
@@ -105,7 +106,7 @@ def main():
             f"--epochs={a.epochs},--seeds={a.seeds},"
             f"--train_end={a.train_end},--val_end={a.val_end},--patience={a.patience},"
             f"--cv={a.cv},--lambda_rank={a.lambda_rank},--demean={a.demean},"
-            f"--lr={a.lr},--weight_decay={a.weight_decay}")
+            f"--lr={a.lr},--weight_decay={a.weight_decay},--seed_base={a.seed_base}")
     if a.cv == "cpcv":
         args += (f",--n_groups={a.n_groups},--k_test={a.k_test},"
                  f"--fold_start={a.fold_start},--fold_end={a.fold_end},--k_book={a.k_book}")

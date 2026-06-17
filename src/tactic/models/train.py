@@ -151,7 +151,7 @@ def train(cfg: dict | None = None, model_kind: str = "f4", epochs: int = 25,
           seeds: int = 1, train_end="2020-12-31", val_end="2021-12-31",
           run_id: str | None = None, patience: int = 5,
           lambda_rank: float = 0.0, demean: bool = False,
-          lr: float = 1e-3, weight_decay: float = 1e-4) -> dict:
+          lr: float = 1e-3, weight_decay: float = 1e-4, seed_base: int = 1338) -> dict:
     cfg = cfg or load_config()
     from ..common.config import CURATED
     feats = pd.read_parquet(CURATED / "features.parquet")
@@ -172,7 +172,7 @@ def train(cfg: dict | None = None, model_kind: str = "f4", epochs: int = 25,
     all_hist, pred_frames, val_losses = [], [], []
     for s in range(seeds):
         h, p, bv = train_one_seed(model_kind, tr, va, te, mu, sd, epochs=epochs,
-                                  seed=1338 + s, patience=patience,
+                                  seed=seed_base + s, patience=patience,
                                   lambda_rank=lambda_rank, demean=demean,
                                   lr=lr, weight_decay=weight_decay)
         all_hist.append(h); pred_frames.append(p.assign(seed=s)); val_losses.append(bv)
@@ -197,7 +197,7 @@ def train(cfg: dict | None = None, model_kind: str = "f4", epochs: int = 25,
     hist.to_csv(run_dir / "loss_history.csv", index=False)
     preds.to_parquet(run_dir / "oos_predictions.parquet", index=False)
     (run_dir / "config.json").write_text(json.dumps(
-        {"model": model_kind, "epochs": epochs, "seeds": seeds,
+        {"model": model_kind, "epochs": epochs, "seeds": seeds, "seed_base": seed_base,
          "train_end": str(train_end), "val_end": str(val_end),
          "lambda_rank": lambda_rank, "demean": demean,
          "n_train": len(tr), "n_val": len(va), "n_test": len(te),

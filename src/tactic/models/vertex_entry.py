@@ -44,6 +44,7 @@ def main(argv=None):
     ap.add_argument("--k_book", type=int, default=35)
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--weight_decay", type=float, default=1e-4)
+    ap.add_argument("--seed_base", type=int, default=1338)
     a = ap.parse_args(argv)
 
     # Vertex installs the package with --no-deps; the pytorch-xla image already has
@@ -88,7 +89,7 @@ def main(argv=None):
     r = train(model_kind=a.model, epochs=a.epochs, seeds=a.seeds,
               train_end=a.train_end, val_end=a.val_end, run_id="vertex_run",
               patience=a.patience, lambda_rank=a.lambda_rank, demean=bool(a.demean),
-              lr=a.lr, weight_decay=a.weight_decay)
+              lr=a.lr, weight_decay=a.weight_decay, seed_base=a.seed_base)
     try:
         from ..reports.results import render_run
         render_run(r["run_id"])
