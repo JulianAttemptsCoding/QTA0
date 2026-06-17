@@ -16,6 +16,12 @@ deep chronological (run2.1) — is an **honest NEGATIVE**: no net-of-cost edge. 
 falls cleanly the further the test set sits from training in time (52.5% → 51.1% → 50.5% → 49.7%) — the
 fingerprint of concept drift. **Conclusion: not deployable.**
 
+![run0 OOS cumulative return vs SPY](run0_oos_return.png)
+
+*run0's out-of-sample run (2023-2026): +92.1% vs SPY +84.0% — a real CAGR beat, but note the deeper
+2025 drawdown (worse risk-adjusted path). The honest read of this and three regime-fair re-validations
+is in [REPORT.md](REPORT.md).*
+
 ## Read these, in order
 
 1. **[REPORT.md](REPORT.md)** — the full report: data, algorithms, all four runs, train/val/test
