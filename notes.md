@@ -422,3 +422,82 @@ run0 had genuine, statistically-significant (t=3.49) cross-sectional skill — b
 a MODEST CAGR beat (and a worse Sharpe), mostly via near-full-long market exposure. run2.1's deep
 predictor is honest coin-flip (slightly below on the overlap). Trading algo is a second-order lever;
 the first-order driver is predictor skill, which is killed by stale-window + degraded-free-data.
+
+---
+
+## 2026-06-17 — run2 (deep CPCV 45-fold) COMPLETE + train/val/test accuracy cross-cut
+
+### run2 finished
+- All 45 CPCV folds (fold_00..44) SUCCEEDED on Vertex. Downloaded + finished locally.
+- Combined OOS: 995,418 obs, 6,506 sessions, 2000-07-25 → 2026-06-08.
+- L/S Sharpe **−1.83**, CAGR −15.6% vs EWpool +14.9% (alpha −16.7%), maxDD −98.8%.
+- long_flat Sharpe 0.71, CAGR +9.8% (still loses to pool +14.9%; β≈0 "alpha" is artifact).
+- **45 path Sharpes: mean −2.66, frac>0 = 0.00** (every regime-fair path negative).
+- Predictor: hit **0.5054 (day-clust t=+5.91, statistically >50%)**, IC +0.0214, IR 0.109, pinball 1.674.
+- S1 val gate pass **32/45** folds (13 fail). DSR 0.000 FAIL, PBO 0.0, DM vs pool p≈0 worse.
+- Result: NEGATIVE, same as run1 + run2.1. Report results/run2_deep_20260613/RESULTS_RUN2.md.
+
+### KEY NUANCE: run2 CPCV predictor is statistically POSITIVE but run2.1 forward is coin-flip
+- run2 (CPCV) hit 50.5% t=+5.91 POSITIVE; run2.1 (chrono forward) hit 49.7% t=−1.56 coin-flip.
+- Same data, same model. Difference = **CPCV adjacency**: each test fold predicted by a model trained
+  on purged-adjacent date groups bracketing it in time → near-in-time training advantage. run2.1's
+  strict 2000-15→2018-26 forward split removes that → edge gone.
+- **Lesson: CPCV measures conditional-on-recent skill, NOT deployable forward skill.** This is the
+  single biggest methodological takeaway. CPCV is great for "is there ANY signal" but its positive
+  result does not imply a forward-deployable edge if the world is non-stationary.
+- Even run2's "positive" is economically dead: IC 0.0214 → Fundamental Law IR≈0; t huge only b/c
+  n=6506 days. Statistical ≠ economic significance.
+
+### Train / Val / Test accuracy comparison (user asked; honest scope)
+**What's persisted:** test directional hit (all 4 runs); val pinball + S1 baseline (all 4);
+train pinball (run0 + run2.1 only — walk/single runs logged loss_history; CPCV folds logged only
+val_pinball in meta). **Train/val DIRECTIONAL HIT was never saved, and NO model checkpoints exist**
+→ can't recompute train/val hit without retraining. Flagged this hard; did not fabricate.
+
+**Test hit (the one valid cross-run accuracy metric):**
+| run | split | train→test gap | test hit | day-clust t | IC |
+|---|---|---|---|---|---|
+| run0 | chrono adjacent | 2016-21→2023-26 ~1yr | 52.5% | +3.49 | 0.0143 |
+| run1 | CPCV interleaved | purged ±2-5d | 51.1% | +5.36 | 0.0200 |
+| run2 | CPCV interleaved | purged ±2-5d | 50.5% | +5.91 | 0.0214 |
+| run2.1 | chrono distant | 2000-15→2018-26 3-11yr | 49.7% | −1.56 | 0.0106 |
+→ **Test accuracy falls monotonically with train→test temporal distance.** Concept-drift signature.
+
+**Val S1 gate (model val pinball vs train-quantile baseline, within-split = VALID):**
+run1 +1.13% margin pass 22/28; run2 +1.11% margin pass 32/45. Model barely beats a constant guess.
+
+**Train vs val pinball (run0, run2.1):** run0 train 1.601 / val 1.669 / test 1.686 (~5% optimism gap,
+mild benign overfit). run2.1 train 1.672 / val 1.427 / test 1.708.
+⚠️ **CAVEAT: pinball NOT comparable across splits** — it scales with each period's return volatility,
+and splits are different calendar eras (run2.1 val 2016-17 calm vs train 2000-15 incl dot-com+GFC).
+run2.1's val<train is a period-scale artifact, NOT generalization. Only within-split S1 is valid.
+
+### Where I'm UNSURE
+1. Train/val directional hit — UNKNOWN (not saved, no ckpt). All train/val "accuracy" = pinball proxy.
+2. How much of run2's +5.91 t is genuine vs CPCV adjacency — lean mostly adjacency, can't quantify
+   without a rolling-recent retrain (= hypothesis #1's direct test).
+3. IC higher run1/run2 than run0 but hit lower — rank-IC vs sign-hit weight different cross-section
+   parts; not fully pinned.
+4. Pinball scale confound — confident it breaks cross-split comparison.
+
+### Literature added for this analysis
+- Gu, Kelly, Xiu (2020, RFS) "Empirical Asset Pricing via ML" — ML edges decay OOS, recent data
+  dominates → supports concept-drift read of run2.1.
+- Quiñonero-Candela et al. (2009) "Dataset Shift in ML" + Hastie-Tibshirani-Friedman ESL —
+  train-error optimism + covariate shift = temporal-distance degradation.
+- Harvey, Liu, Zhu (2016) — t>3 multiple-testing bar; run1/run2 clear it on directional t but fail
+  economically. + de Prado AFML ch7/12 (CPCV adjacency), Bailey-LdP DSR/PBO (deflation).
+
+### Infra note (gcloud)
+- Local `gcloud` crashes: "untrusted mount point ... OpenAI\Codex\bin". Root cause = Codex bin on
+  PATH; gcloud refuses to traverse it during command-load (affects ALL gcloud cmds incl storage cp +
+  custom-jobs create). Workaround: strip Codex from PATH for gcloud, OR use `gsutil` (separate binary,
+  unaffected). finish_run.py's `gcloud storage cp` hit this → finished run2 via gsutil download +
+  inline aggregate_combined + build_report instead. No code changed.
+- `gh` auth token is INVALID (expired). Blocks `gh repo rename` + git push until re-auth
+  (`gh auth login -h github.com`). Local commits unaffected.
+
+### Repo renamed → QTA0
+- This project renamed to **QTA0** (Quant Trading Algorithm 0). REPORT.md rewritten as the canonical
+  learn-from-everything doc (data, algos, all 4 runs, train/val/test, theory, unsure-list, reproduce).
+  README.md = repo index. Scratch logs removed. GitHub repo + local folder → QTA0.

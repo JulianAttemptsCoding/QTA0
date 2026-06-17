@@ -1,102 +1,74 @@
-# TACTIC-MoB v4
+# QTA0 — Quant Trading Algorithm 0
 
-**Transaction-cost-Aware, Component-decomposed, Throttled Implementation of Calibrated
-Mixture-of-Betting experts** — a daily-frequency, long-only/long-flat, cross-sectional US
-equity strategy with conformally-calibrated forecasts, e-value monitoring, alpha-decay-matched
-partial-adjustment trading under a hard turnover budget, and per-asset/day cost estimation.
+A daily-frequency, cross-sectional US-equity **mixture-of-experts forecaster** (TACTIC-MoB v4),
+built end-to-end, trained on Vertex AI, and **regime-robustly re-validated** with combinatorial
+purged cross-validation and a full backtest-overfitting firewall.
 
-The full build specification is in [`PLAN.md`](PLAN.md). The null hypothesis (no deployable
-edge) is presumed true until every kill gate in §17 passes. **A halted build is a successful
-run** (§0.3.10).
+This repo is meant to be **learned from**. It documents an honest research arc: a config that looked
+like it beat SPY, and what happened when it was tested fairly.
 
-> Scope of this milestone: empty repo → validated backtest with all anti-overfitting gates
-> evaluated. Live/paper trading is out of scope (Appendix F).
+## The one-paragraph result
 
-## Status
+A single historical configuration (**run0**) beat SPY *on CAGR* (+2.6%/yr) — but with a *worse*
+Sharpe and drawdown, and the edge was mostly market beta plus a small, genuine stock-selection signal
+(test hit 52.5%, t=+3.49). Every regime-fair re-validation — clean CPCV (run1), deep CPCV (run2), and
+deep chronological (run2.1) — is an **honest NEGATIVE**: no net-of-cost edge. Test directional accuracy
+falls cleanly the further the test set sits from training in time (52.5% → 51.1% → 50.5% → 49.7%) — the
+fingerprint of concept drift. **Conclusion: not deployable.**
 
-| Layer | State |
-|-------|-------|
-| Phase 0 — scaffold, registry, gates, contracts, IO, calendar | **implemented + tested** |
-| Phase 1 — ingestion (Alpaca bars/auctions/assets/CA, French factors, Wikipedia, EDGAR), Day-1 audits (G0a) | **implemented** (live-verified) |
-| Phase 2 — universe (PIT membership), delistings/terminal returns (G0b) | **implemented + tested** |
-| Phase 3 — spread surface (Corwin-Schultz, Abdi-Ranaldo, EDGE blend) + cost model/break-even | **implemented + tested** |
-| Phase 4 — labels (A.1 components, z_top, EWMA σ, vol-standardized y) | **implemented + tested** |
-| Phase 5 — diagnostics (variance ratio, IC decay, tug-of-war) + gate G1/G1b | **implemented + tested** |
-| Math libs — MODWT, quantile/pinball, DSR, Diebold-Mariano, NAV accounting | **implemented + tested** |
-| Phase 4 features tensor, Phases 6–14 (baselines, experts/training, aggregation, decision, backtest, stress, firewall, reports) | **scaffolded** (typed stubs; halt at boundary) |
-| Vertex AI submission (custom-jobs, Vizier spec, packaging) | **implemented** |
+## Read these, in order
 
-`make all` runs the §18 order and stops cleanly at the first scaffold boundary or kill gate.
+1. **[REPORT.md](REPORT.md)** — the full report: data, algorithms, all four runs, train/val/test
+   accuracy, the core analysis, theory + literature, what's uncertain, how to reproduce.
+2. **[notes.md](notes.md)** — the raw chronological lab log: every decision, bug, and idea.
+3. **[PLAN.md](PLAN.md)** — the original build spec (18-channel features, experts f3/f4, decision layer).
+4. **[revision_plan.md](revision_plan.md)** — the re-validation design (why CPCV, two runs, benchmarks).
 
-## Results (out-of-sample 2023, trained on Vertex AI)
+## The four runs
 
-Full pipeline run end-to-end on 83 liquid S&P-500 names. f4 (hybrid attention) trained on Vertex
-(`n1-standard-16`), 20 epochs × 3 seeds. **OOS strategy vs SPY buy-and-hold:**
+| run | data | universe | validation | test hit | verdict |
+|---|---|---|---|---|---|
+| run0 | Alpaca SIP | 83 | chronological, adjacent | 52.5% (t=+3.49) | CAGR-beat only |
+| run1 | Alpaca SIP | 196 | CPCV(8,2) 28 folds | 51.1% (t=+5.36) | NEGATIVE |
+| run2 | yfinance | 153 | CPCV(10,2) 45 folds | 50.5% (t=+5.91) | NEGATIVE |
+| run2.1 | yfinance | 153 | chronological, distant | 49.7% (t=−1.56) | NEGATIVE (coin-flip) |
 
-| | TACTIC-MoB (net) | SPY |
-|---|---|---|
-| CAGR | **41.9%** | 24.1% |
-| Sharpe | **1.82** | 1.68 |
-| Max drawdown | -9.2% | -9.6% |
-| Alpha (ann.) | **+9.1%** | — |
-| OOS rank-IC | 0.0157 | — |
-
-Breadth matters: the same model on only 15 names has ~0 OOS IC and trails SPY (Fundamental Law,
-`IR≈IC·√breadth`). Full writeup + graphs (equity vs SPY, drawdown, train/val loss curves,
-calibration): [`results/FINAL_REPORT.md`](results/FINAL_REPORT.md).
-
-> Calibration note: the spread blend is the spec'd median of three *daily-OHLC* estimators
-> (PLAN.md §5.1); Corwin-Schultz/Abdi-Ranaldo run high on liquid daily bars, so blended
-> medians are conservative. Tighten with minute bars or an EDGE-weighted blend when wiring
-> the live loop.
-
-## Quickstart
-
-```bash
-# 1. install (editable)
-uv pip install -e ".[dev]"        # or: pip install -e ".[dev]"
-
-# 2. credentials
-cp .env.example .env              # fill APCA_API_KEY_ID / APCA_API_SECRET_KEY / SEC_USER_AGENT
-
-# 3. tests (green on the scaffold)
-python make.py test               # Windows; or `make test` on Linux/macOS
-
-# 4. run the pipeline (smoke symbol set, fast)
-python make.py setup
-python make.py data-factors
-python make.py data-alpaca        # add --full for the whole candidate universe (hours)
-python make.py day1-audits
-python make.py all                # full §18 order; halts at the scaffold boundary
-```
-
-On Linux/macOS with GNU make installed, use `make <target>` instead of `python make.py <target>`.
-
-## Heavy compute → Vertex AI
-
-GPU/large-CPU work runs on Vertex AI; light work runs locally. See [`vertex/README.md`](vertex/README.md).
-
-```bash
-python vertex/submit.py --module tactic.models.hpo_vertex --gpu --args expert=f4 refit=2021
-```
+> runs 2 / 2.1 use survivorship-biased free data → benchmarked only against their own pool, never SPY,
+> never deployable. See REPORT.md §1.
 
 ## Layout
 
 ```
-configs/            v1.yaml (Appendix B + gate table + vertex)
-src/tactic/
-  common/           config, hashing, registry (honest-N ledger), gates, contracts, io, calendar
-  ingest/           alpaca_*, factors_french, wiki_constituents, edgar_xcheck, day1_audits
-  universe/ costs/ labels/ features/ diagnostics/ regime/ risk/
-  models/ (experts/) uq/ agg/ portfolio/ backtest/ validation/ stress/ reports/
-  cli.py            pipeline driver (make targets)
-tests/              contract + unit tests (pytest)
-vertex/             submit.py, vizier_spec.yaml, Dockerfile
-data/ registry/ reports/   (generated; gitignored)
+REPORT.md / notes.md / PLAN.md / revision_plan.md   the writeups
+configs/v1.yaml      all hyperparameters + gate table
+src/tactic/          library: features, experts (f3/f4), train, CPCV, backtest, firewall, reports
+vertex/              cloud submit / finish (Vertex AI custom-jobs)
+scripts/             one-off analysis (old-trader rerun, accuracy graph)
+results/<run>/        per-run artifacts (RESULTS_*.md, report.json, plots)
+tests/               pytest suite
+data/ registry/      generated panels + honest-N ledger (gitignored, local only)
 ```
+
+## Quickstart
+
+```bash
+pip install -e ".[dev]"
+cp .env.example .env          # Alpaca / SEC credentials (only needed to rebuild the clean panel)
+python make.py test           # run the test suite
+```
+
+Reproduce the analysis (predictions are already in `results/`):
+
+```bash
+python scripts/rerun_run21_oldtrader.py   # run0's trader on run2.1 preds
+python scripts/graph_accuracy.py          # run0 vs run2.1 accuracy over OOS time
+```
+
+Heavy training runs on Vertex AI (`vertex/`); the finishers (`vertex/finish_run.py`) aggregate CPCV
+folds and build the per-run reports locally.
 
 ## Non-negotiables (enforced in code)
 
-Temporal PIT contracts, fit-scope discipline, SIP-only feed, no per-ticker models, single
-pinball objective, post-hoc-only calibration, filesystem-locked 18-month holdout, automatic
-honest-N trial ledger, populated terminal returns, and halting kill gates. See `PLAN.md §0.3`.
+Temporal PIT contracts, fit-scope discipline, no per-ticker models, single pinball objective, the deep
+panel quarantined from the clean panel, an automatic honest-N trial ledger for deflation, and **no OOS
+peeking**. See `PLAN.md §0.3`.
